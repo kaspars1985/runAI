@@ -351,6 +351,8 @@
       align-items: center;
       gap: 10px;
       min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
     }
 
     .vm-pill {
@@ -367,6 +369,7 @@
       color: var(--vm-text);
       white-space: nowrap;
       transition: all 0.35s ease;
+      flex-shrink: 0;
     }
 
     .vm-pill[data-state="recording"] {
@@ -424,6 +427,8 @@
       font-size: 11.5px;
       color: var(--vm-text-dim);
       letter-spacing: 0.03em;
+      white-space: nowrap;
+      flex-shrink: 0;
       transition: opacity 0.3s ease;
     }
 
@@ -439,6 +444,8 @@
       font-size: 11.5px;
       font-weight: 500;
       cursor: pointer;
+      flex-shrink: 0;
+      white-space: nowrap;
       transition: all 0.25s ease;
     }
     .vm-replay:hover {
@@ -484,7 +491,7 @@
       margin: 0 auto;
       text-align: center;
       font-size: clamp(19px, 2.55vw, 29px);
-      line-height: 1.38;
+      line-height: 1.42;
       font-weight: 600;
       letter-spacing: -0.015em;
       color: #ffffff;
@@ -495,6 +502,10 @@
       text-shadow:
         0 0 28px rgba(34, 211, 238, 0.24),
         0 0 60px rgba(139, 92, 246, 0.16);
+    }
+
+    .vm-phrase {
+      display: inline;
     }
 
     .vm-word {
@@ -562,8 +573,20 @@
     }
 
     @media (max-width: 640px) {
-      .vm-main { height: 165px; padding: 0 16px; }
-      .vm-hud { padding: 11px 14px; }
+      .vm-main { height: 165px; padding: 0 14px; }
+      .vm-hud { padding: 10px 14px; gap: 8px; }
+      .vm-hud-left { gap: 8px; }
+      .vm-pill { font-size: 11px; padding: 4px 10px 4px 8px; }
+      .vm-timer { font-size: 11px; }
+      .vm-replay { padding: 5px 8px; font-size: 11px; }
+      .vm-replay span { display: none; }
+      .vm-phrase { display: inline-block; }
+      .vm-phrase-space { display: none; }
+      .vm-text-layer {
+        font-size: clamp(16px, 4.3vw, 20px);
+        line-height: 1.5;
+        padding: 0 6px;
+      }
     }
   </style>
 </head>
@@ -1293,7 +1316,10 @@
 
     /* ===== Voice -> Text Morph Showcase Engine ===== */
     (function initVoiceMorphStage() {
-      const SENTENCE = "Šodien ir lieliska diena, lai uzsāktu kādu projektu";
+      const PHRASES = [
+        "Šodien ir lieliska diena,",
+        "lai uzsāktu kādu projektu"
+      ];
 
       const PHASE = {
         RECORD: 3200,
@@ -1338,22 +1364,38 @@
         textLayer.innerHTML = "";
         charEls.length = 0;
 
-        const words = SENTENCE.split(" ");
-        words.forEach((word, wIdx) => {
-          const wordSpan = document.createElement("span");
-          wordSpan.className = "vm-word";
-          for (let i = 0; i < word.length; i++) {
-            const span = document.createElement("span");
-            span.className = "vm-char";
-            span.textContent = word[i];
-            wordSpan.appendChild(span);
-            charEls.push(span);
-          }
-          textLayer.appendChild(wordSpan);
+        PHRASES.forEach((phrase, pIdx) => {
+          const phraseSpan = document.createElement("span");
+          phraseSpan.className = "vm-phrase";
 
-          if (wIdx < words.length - 1) {
+          const words = phrase.split(" ");
+          words.forEach((word, wIdx) => {
+            const wordSpan = document.createElement("span");
+            wordSpan.className = "vm-word";
+            for (let i = 0; i < word.length; i++) {
+              const span = document.createElement("span");
+              span.className = "vm-char";
+              span.textContent = word[i];
+              wordSpan.appendChild(span);
+              charEls.push(span);
+            }
+            phraseSpan.appendChild(wordSpan);
+
+            if (wIdx < words.length - 1) {
+              const spaceSpan = document.createElement("span");
+              spaceSpan.className = "vm-char";
+              spaceSpan.setAttribute("data-space", "true");
+              spaceSpan.textContent = "\u00A0";
+              phraseSpan.appendChild(spaceSpan);
+              charEls.push(spaceSpan);
+            }
+          });
+
+          textLayer.appendChild(phraseSpan);
+
+          if (pIdx < PHRASES.length - 1) {
             const spaceSpan = document.createElement("span");
-            spaceSpan.className = "vm-char";
+            spaceSpan.className = "vm-char vm-phrase-space";
             spaceSpan.setAttribute("data-space", "true");
             spaceSpan.textContent = "\u00A0";
             textLayer.appendChild(spaceSpan);
@@ -1371,41 +1413,21 @@
       let dpr = 1;
       let cssW = 0;
       let cssH = 0;
-      let charMetrics = []; // { normX, rightX, topY, height } relative to textLayer
+      let charMetrics = []; // { rightRel, topRel, height } relative to textLayer
 
       function measureChars() {
-        // Temporarily reset transform to get accurate layout coordinates
         const savedTransforms = charEls.map((el) => el.style.transform);
         charEls.forEach((el) => { el.style.transform = "none"; });
 
         const layerRect = textLayer.getBoundingClientRect();
-        const mainRect = main.getBoundingClientRect();
-        const mainW = Math.max(1, mainRect.width);
-
-        let minX = Infinity;
-        let maxX = -Infinity;
-        const raw = charEls.map((el) => {
+        charMetrics = charEls.map((el) => {
           const r = el.getBoundingClientRect();
-          const cxMain = (r.left + r.width / 2) - mainRect.left;
-          if (cxMain < minX) minX = cxMain;
-          if (cxMain > maxX) maxX = cxMain;
           return {
-            cxMain,
             rightRel: r.right - layerRect.left,
             topRel: r.top - layerRect.top,
-            height: r.height
+            height: r.height || 24
           };
         });
-
-        const spanW = Math.max(1, maxX - minX);
-        charMetrics = raw.map((m, idx) => ({
-          // Mix horizontal position & sequence index so wrapped lines still reveal monotonically
-          normX: 0.06 + 0.86 * (0.65 * ((m.cxMain - minX) / spanW) + 0.35 * (idx / Math.max(1, charEls.length - 1))),
-          canvasNormX: m.cxMain / mainW,
-          rightRel: m.rightRel,
-          topRel: m.topRel,
-          height: m.height
-        }));
 
         charEls.forEach((el, i) => { el.style.transform = savedTransforms[i]; });
       }
@@ -1528,20 +1550,16 @@
           compressAtX = () => 0;
           flareAtX = () => 0;
         } else if (phase === "morph") {
-          const scan = scanPos;
+          // As transcription starts, smoothly compress the wave toward center and fade it out
+          const waveCollapse = Math.max(0, 1 - phaseProgress / 0.35);
           ampAtX = (nx) => {
-            if (nx < scan - 0.08) return 0;
             const centerBell = Math.sin(nx * Math.PI);
-            return 0.72 * (0.35 + 0.65 * centerBell) * (0.75 + 0.25 * Math.sin(now * 0.01 + nx * 22));
+            return 0.5 * centerBell * waveCollapse * (0.8 + 0.2 * Math.sin(now * 0.01 + nx * 20));
           };
-          compressAtX = (nx) => {
-            if (nx > scan) return 0;
-            const d = scan - nx;
-            return Math.min(1, d * 10.5);
-          };
+          compressAtX = (nx) => Math.min(1, phaseProgress * 3.0);
           flareAtX = (nx) => {
-            const d = Math.abs(nx - scan);
-            return Math.max(0, 1 - d * 13);
+            if (phaseProgress > 0.35) return 0;
+            return (1 - phaseProgress / 0.35) * 0.5;
           };
         } else if (phase === "hold") {
           ampAtX = () => 0;
@@ -1555,11 +1573,14 @@
           flareAtX = () => 0;
         }
 
-        // 1. Harmonic glowing ribbons (only visible where wave has not yet morphed into text)
+        // 1. Harmonic glowing ribbons (only visible when not in hold and during morph's early collapse)
         if (phase !== "hold") {
-          const ribbonAlpha = phase === "dissolve"
-            ? Math.max(0, (phaseProgress - 0.45) / 0.55)
-            : 1;
+          let ribbonAlpha = 1;
+          if (phase === "morph") {
+            ribbonAlpha = Math.max(0, 1 - phaseProgress / 0.35);
+          } else if (phase === "dissolve") {
+            ribbonAlpha = Math.max(0, (phaseProgress - 0.45) / 0.55);
+          }
 
           if (ribbonAlpha > 0.01) {
             const ribbonConfigs = [
@@ -1576,12 +1597,8 @@
               const cfg = ribbonConfigs[r];
               ctx.beginPath();
               const steps = 130;
-              let started = false;
               for (let i = 0; i <= steps; i++) {
                 const nx = i / steps;
-                // Skip drawing ribbon behind already-morphed text so it never strikes through letters
-                if (phase === "morph" && nx < scanPos - 0.03) continue;
-
                 const x = nx * w;
                 const amp = ampAtX(nx);
                 const comp = compressAtX(nx);
@@ -1598,29 +1615,15 @@
                   y += Math.sin(nx * 45 + now * 0.025) * flare * 9 * (1 - comp * 0.5);
                 }
 
-                if (!started) {
-                  ctx.moveTo(x, y);
-                  started = true;
-                } else {
-                  ctx.lineTo(x, y);
-                }
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
               }
 
               const grad = ctx.createLinearGradient(0, 0, w, 0);
-              if (phase === "morph") {
-                const cut = Math.max(0, Math.min(0.92, scanPos - 0.02));
-                const fadeIn = Math.min(0.96, cut + 0.06);
-                grad.addColorStop(0, cfg.c2);
-                grad.addColorStop(cut, cfg.c2);
-                grad.addColorStop(fadeIn, cfg.c1);
-                grad.addColorStop(0.92, cfg.c1);
-                grad.addColorStop(1, cfg.c2);
-              } else {
-                grad.addColorStop(0, cfg.c2);
-                grad.addColorStop(0.12, cfg.c1);
-                grad.addColorStop(0.88, cfg.c1);
-                grad.addColorStop(1, cfg.c2);
-              }
+              grad.addColorStop(0, cfg.c2);
+              grad.addColorStop(0.12, cfg.c1);
+              grad.addColorStop(0.88, cfg.c1);
+              grad.addColorStop(1, cfg.c2);
 
               ctx.strokeStyle = grad;
               ctx.lineWidth = cfg.width;
@@ -1634,92 +1637,88 @@
         }
 
         // 2. Vertical spectral frequency bars
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-
-        const barAreaW = w * 0.88;
-        const barStartX = (w - barAreaW) / 2;
-        const barGap = barAreaW / BAR_COUNT;
-        const barW = Math.max(2.2, barGap * 0.52);
-        const maxBarH = h * 0.54;
-
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const nx = (i + 0.5) / BAR_COUNT;
-          const x = barStartX + i * barGap + barGap / 2;
-          const amp = ampAtX(nx);
-          const comp = compressAtX(nx);
-          const flare = flareAtX(nx);
-
-          if (comp >= 0.98 && flare <= 0.02) continue;
-
-          const seed = Math.sin(i * 12.9898) * 43758.5453;
-          const rand = seed - Math.floor(seed);
-          const harmonic = 0.55 + 0.45 * Math.sin(now * 0.0085 + i * 0.65 + rand * 5);
-
-          let barH = maxBarH * amp * harmonic * (0.55 + rand * 0.65);
-          barH = Math.max(3, barH);
-          barH *= (1 - comp * 0.96);
-
-          if (flare > 0) {
-            barH += flare * 24 * (1 - comp * 0.4);
-          }
-
-          const y = cy - barH / 2;
-          const alphaScale = Math.max(0, 1 - comp * 0.95);
-
-          let colTop, colMid, colBot;
-          if (nx < 0.35) {
-            colTop = `rgba(103, 232, 249, ${0.92 * alphaScale})`;
-            colMid = `rgba(34, 211, 238, ${0.85 * alphaScale})`;
-            colBot = `rgba(59, 130, 246, ${0.45 * alphaScale})`;
-          } else if (nx < 0.68) {
-            colTop = `rgba(147, 197, 253, ${0.92 * alphaScale})`;
-            colMid = `rgba(99, 102, 241, ${0.85 * alphaScale})`;
-            colBot = `rgba(168, 85, 247, ${0.45 * alphaScale})`;
-          } else {
-            colTop = `rgba(240, 171, 252, ${0.92 * alphaScale})`;
-            colMid = `rgba(236, 72, 153, ${0.85 * alphaScale})`;
-            colBot = `rgba(244, 114, 182, ${0.45 * alphaScale})`;
-          }
-
-          const grad = ctx.createLinearGradient(0, y, 0, y + barH);
-          grad.addColorStop(0, colTop);
-          grad.addColorStop(0.5, colMid);
-          grad.addColorStop(1, colBot);
-
-          ctx.fillStyle = grad;
-          ctx.shadowColor = colMid;
-          ctx.shadowBlur = 6 + flare * 18;
-
-          roundRect(ctx, x - barW / 2, y, barW, barH, barW / 2);
-          ctx.fill();
-
-          if (phase === "record" && amp > 0.52 && Math.random() < 0.06) {
-            spawnParticle(x, y, amp, false);
-            spawnParticle(x, y + barH, amp, false);
-          }
+        let barAlpha = 1;
+        if (phase === "morph") {
+          barAlpha = Math.max(0, 1 - phaseProgress / 0.35);
+        } else if (phase === "hold") {
+          barAlpha = 0;
+        } else if (phase === "dissolve") {
+          barAlpha = Math.max(0, (phaseProgress - 0.45) / 0.55);
         }
-        ctx.shadowBlur = 0;
-        ctx.restore();
 
-        // 3. Morph Energy Scanline Beam
-        if (phase === "morph" && scanPos > 0.01 && scanPos < 0.99) {
-          const sx = (0.06 + scanPos * 0.88) * w;
+        if (barAlpha > 0.01) {
           ctx.save();
+          ctx.globalAlpha = barAlpha;
           ctx.globalCompositeOperation = "lighter";
 
-          const aura = ctx.createLinearGradient(sx - 55, 0, sx + 45, 0);
-          aura.addColorStop(0, "rgba(34, 211, 238, 0)");
-          aura.addColorStop(0.55, "rgba(56, 189, 248, 0.28)");
-          aura.addColorStop(0.8, "rgba(236, 72, 153, 0.32)");
-          aura.addColorStop(1, "rgba(236, 72, 153, 0)");
-          ctx.fillStyle = aura;
-          ctx.fillRect(sx - 55, cy - h * 0.38, 100, h * 0.76);
+          const barAreaW = w * 0.88;
+          const barStartX = (w - barAreaW) / 2;
+          const barGap = barAreaW / BAR_COUNT;
+          const barW = Math.max(2.2, barGap * 0.52);
+          const maxBarH = h * 0.54;
 
-          if (Math.random() < 0.75) {
-            spawnParticle(sx, cy + (Math.random() - 0.5) * 38, 1.25, true);
+          for (let i = 0; i < BAR_COUNT; i++) {
+            const nx = (i + 0.5) / BAR_COUNT;
+            const x = barStartX + i * barGap + barGap / 2;
+            const amp = ampAtX(nx);
+            const comp = compressAtX(nx);
+            const flare = flareAtX(nx);
+
+            if (comp >= 0.98 && flare <= 0.02) continue;
+
+            const seed = Math.sin(i * 12.9898) * 43758.5453;
+            const rand = seed - Math.floor(seed);
+            const harmonic = 0.55 + 0.45 * Math.sin(now * 0.0085 + i * 0.65 + rand * 5);
+
+            let barH = maxBarH * amp * harmonic * (0.55 + rand * 0.65);
+            barH = Math.max(3, barH);
+            barH *= (1 - comp * 0.96);
+
+            if (flare > 0) {
+              barH += flare * 24 * (1 - comp * 0.4);
+            }
+
+            const y = cy - barH / 2;
+
+            let colTop, colMid, colBot;
+            if (nx < 0.35) {
+              colTop = "rgba(103, 232, 249, 0.92)";
+              colMid = "rgba(34, 211, 238, 0.85)";
+              colBot = "rgba(59, 130, 246, 0.45)";
+            } else if (nx < 0.68) {
+              colTop = "rgba(147, 197, 253, 0.92)";
+              colMid = "rgba(99, 102, 241, 0.85)";
+              colBot = "rgba(168, 85, 247, 0.45)";
+            } else {
+              colTop = "rgba(240, 171, 252, 0.92)";
+              colMid = "rgba(236, 72, 153, 0.85)";
+              colBot = "rgba(244, 114, 182, 0.45)";
+            }
+
+            const grad = ctx.createLinearGradient(0, y, 0, y + barH);
+            grad.addColorStop(0, colTop);
+            grad.addColorStop(0.5, colMid);
+            grad.addColorStop(1, colBot);
+
+            ctx.fillStyle = grad;
+            ctx.shadowColor = colMid;
+            ctx.shadowBlur = 6 + flare * 18;
+
+            roundRect(ctx, x - barW / 2, y, barW, barH, barW / 2);
+            ctx.fill();
+
+            if (phase === "record" && amp > 0.52 && Math.random() < 0.06) {
+              spawnParticle(x, y, amp, false);
+              spawnParticle(x, y + barH, amp, false);
+            }
           }
+          ctx.shadowBlur = 0;
           ctx.restore();
+        }
+
+        // 3. Morph Energy Burst Particles (clean, no boxy scanline overlay)
+        if (phase === "morph" && phaseProgress < 0.35 && Math.random() < 0.45) {
+          spawnParticle(w / 2 + (Math.random() - 0.5) * (w * 0.65), cy + (Math.random() - 0.5) * 24, 1.25, true);
         }
 
         // 4. Luminous Particles
@@ -1785,10 +1784,12 @@
         const m = charMetrics[Math.max(0, Math.min(charMetrics.length - 1, charIdx))];
         if (!m) return;
         caretEl.style.height = `${Math.round(m.height * 0.88)}px`;
-        caretEl.style.transform = `translate3d(${Math.round(m.rightRel + 3)}px, ${Math.round(m.topRel + m.height * 0.07)}px, 0)`;
+        caretEl.style.transform = `translate3d(${Math.round(m.rightRel + 2)}px, ${Math.round(m.topRel + m.height * 0.06)}px, 0)`;
       }
 
       function updateCharsAndHUD(scanPos, phase, phaseProgress, elapsedMs) {
+        const isMobile = window.innerWidth <= 640;
+
         if (phase === "record") {
           for (let i = 0; i < charEls.length; i++) {
             setCharMorphState(charEls[i], i, 0, 1);
@@ -1797,7 +1798,7 @@
           textLayer.setAttribute("data-glow", "false");
 
           pill.setAttribute("data-state", "recording");
-          pillText.textContent = "⌥ Option turēts · Klausās balsi...";
+          pillText.textContent = isMobile ? "⌥ Klausās..." : "⌥ Option turēts · Klausās balsi...";
           const sec = (elapsedMs / 1000).toFixed(1);
           timerEl.textContent = `00:0${sec}`;
           timerEl.style.opacity = "1";
@@ -1810,19 +1811,20 @@
 
         if (phase === "morph") {
           let lastIdx = 0;
+          const totalChars = Math.max(1, charEls.length - 1);
           for (let i = 0; i < charEls.length; i++) {
-            const cpos = charMetrics[i] ? charMetrics[i].normX : (i / charEls.length);
-            const local = (scanPos - (cpos - 0.04)) / 0.11;
+            const seq = i / totalChars;
+            const local = (scanPos - (seq - 0.04)) / 0.10;
             const t = Math.max(0, Math.min(1, local));
             setCharMorphState(charEls[i], i, t, 1);
-            if (t > 0.25) lastIdx = i;
+            if (t > 0.15) lastIdx = i;
           }
-          positionCaretAfterChar(lastIdx, scanPos > 0.04, false);
+          positionCaretAfterChar(lastIdx, scanPos > 0.03, false);
           textLayer.setAttribute("data-glow", "true");
 
           pill.setAttribute("data-state", "processing");
-          pillText.textContent = "⚡ Atlaid taustiņu · Atšifrē (0.14s)...";
-          timerEl.textContent = "Metal GPU";
+          pillText.textContent = isMobile ? "⚡ Atšifrē..." : "⚡ Atlaid taustiņu · Atšifrē (0.14s)...";
+          timerEl.textContent = isMobile ? "GPU" : "Metal GPU";
 
           if (step1) step1.setAttribute("data-active", "none");
           if (step2) step2.setAttribute("data-active", "purple");
@@ -1838,8 +1840,8 @@
           textLayer.setAttribute("data-glow", "true");
 
           pill.setAttribute("data-state", "done");
-          pillText.textContent = "✓ Teksts ievietots kursorā";
-          timerEl.textContent = "100% lokāli";
+          pillText.textContent = isMobile ? "✓ Teksts kursorā" : "✓ Teksts ievietots kursorā";
+          timerEl.textContent = isMobile ? "Lokāli" : "100% lokāli";
 
           if (step1) step1.setAttribute("data-active", "none");
           if (step2) step2.setAttribute("data-active", "none");
