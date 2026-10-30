@@ -1,0 +1,11 @@
+# Būvēšanas starprezultāti un artefakti
+.build/
+.buildtmp/
+runAI.app/
+runAI.dmg
+dist/dmg_staging/
+dist/staging/
+_backups/
+.DS_Store
+*.swp
+*~

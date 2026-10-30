@@ -1,0 +1,10 @@
+1. Ievelciet runAI mapē «Programmas».
+2. Palaidiet runAI. Ja macOS neļauj atvērt:
+   Sistēmas iestatījumi → Konfidencialitāte un drošība → «Atvērt tik un tā».
+3. Atļaujiet piekļuvi mikrofonam un pievienojiet runAI sadaļā
+   «Universālā piekļuve» (Accessibility).
+4. Ikonai runAI → «Iestatījumi…» → lejupielādējiet modeli un izvēlieties
+   karsto taustiņu.
+
+Modeli var nelejupielādēt, bet iekopēt mapē
+~/Library/Application Support/runAI/Models/
