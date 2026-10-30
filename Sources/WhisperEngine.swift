@@ -58,7 +58,9 @@ final class WhisperEngine: @unchecked Sendable {
                 DispatchQueue.main.async { completion(.failure(WhisperError.notLoaded)) }
                 return
             }
-            guard !samples.isEmpty else {
+            // A-08: Nometam audio, kas ir īsāks par 300 ms (4800 paraugi pie 16 kHz),
+            // lai novērstu Whisper halucinācijas pie nejaušiem īsiem taustiņa klikšķiem.
+            guard samples.count >= 4800 else {
                 DispatchQueue.main.async { completion(.success("")) }
                 return
             }
@@ -70,7 +72,8 @@ final class WhisperEngine: @unchecked Sendable {
             params.print_special = false
             params.no_context = true
             params.no_timestamps = true
-            params.single_segment = true
+            // A-02: Atļaujam vairāku teikumu diktēšanu bez apraušanas pie pauzēm.
+            params.single_segment = false
             params.translate = false
 
             let forced = language != "auto"
@@ -99,7 +102,9 @@ final class WhisperEngine: @unchecked Sendable {
                     parts.append(String(cString: seg))
                 }
             }
+            // A-09: Unicode NFC normalizācija latviešu diakritiskajām zīmēm
             resultText = parts.joined()
+                .precomposedStringWithCanonicalMapping
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
             DispatchQueue.main.async { completion(.success(resultText)) }

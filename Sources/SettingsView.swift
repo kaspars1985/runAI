@@ -351,6 +351,24 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                Divider().opacity(0.5)
+
+                // A-10: Automātiska atjauninājumu pārbaude
+                Toggle(isOn: Binding(
+                    get: { state.autoCheckUpdates },
+                    set: { state.setAutoCheckUpdates($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pārbaudīt atjauninājumus")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(colors.textPrimary)
+                        Text("Automātiski noskaidrot jaunākās versijas esamību.")
+                            .font(.system(size: 10))
+                            .foregroundColor(colors.textMuted)
+                    }
+                }
+                .toggleStyle(.checkbox)
             }
         }
     }

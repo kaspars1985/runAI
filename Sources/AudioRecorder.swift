@@ -25,7 +25,9 @@ final class AudioRecorder {
     private let sampleRate: Double = 16000
     private var isTapped = false
     private var currentDeviceUID: String?
+    private var lastConfiguredDeviceUID: String?
     private var configObserver: NSObjectProtocol?
+    private let maxSamples = 16000 * 60 * 10 // 10 minūtes @ 16 kHz mono (A-03: aizsardzība pret atmiņas noplūdi)
 
     private(set) var samples: [Float] = []
     /// Mikrofona līmenis (0…1), tiek izsaukts galvenajā pavedienā.
@@ -69,6 +71,17 @@ final class AudioRecorder {
     }
 
     private func startEngine(applyDeviceUID: Bool) throws {
+        let requestedUID = applyDeviceUID ? currentDeviceUID : nil
+        // A-03: Ātrā palaišana — ja engine jau eksistē un konfigurācija nav mainījusies,
+        // nav nepieciešams veidot jaunu AVAudioEngine, kas patērē ~200ms un apēd pirmo vārdu.
+        if let existing = self.engine,
+           isTapped,
+           lastConfiguredDeviceUID == requestedUID {
+            existing.prepare()
+            try existing.start()
+            return
+        }
+
         // Vispirms sakopjam iepriekšējo engine, ja tāds bija aktīvs
         if let oldEng = self.engine {
             if isTapped {
@@ -81,10 +94,10 @@ final class AudioRecorder {
             self.engine = nil
         }
 
-        // Jauna AVAudioEngine instance katrā palaišanā — novērš novecojušu
-        // kešoto outputFormat (piem., 48000 Hz, kamēr Bluetooth pārslēdzas uz 24000 Hz).
+        // Jauna AVAudioEngine instance
         let eng = AVAudioEngine()
         self.engine = eng
+        self.lastConfiguredDeviceUID = requestedUID
 
         if applyDeviceUID, let uid = currentDeviceUID {
             let defaultUID = AudioDevices.defaultInputUID()
@@ -157,6 +170,15 @@ final class AudioRecorder {
     }
 
     func stop() {
+        if let eng = engine, eng.isRunning {
+            eng.pause()
+        }
+        isRunning = false
+        AppLogger.info("AudioRecorder.stop: apturēts")
+    }
+
+    /// Pilnībā atbrīvo audio resursus (piem., lietotni aizverot).
+    func tearDown() {
         if let observer = configObserver {
             NotificationCenter.default.removeObserver(observer)
             configObserver = nil
@@ -171,8 +193,8 @@ final class AudioRecorder {
             }
         }
         engine = nil
+        lastConfiguredDeviceUID = nil
         isRunning = false
-        AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
     /// Atgriež un notīra uzkrātos paraugus (pavediendroši).
@@ -226,7 +248,10 @@ final class AudioRecorder {
 
         let copy = Array(UnsafeBufferPointer(start: ptr, count: n))
         queue.async { [weak self] in
-            self?.samples.append(contentsOf: copy)
+            guard let self = self else { return }
+            if self.samples.count < self.maxSamples {
+                self.samples.append(contentsOf: copy)
+            }
         }
         DispatchQueue.main.async { [weak self] in
             self?.onLevel?(level)

@@ -41,7 +41,48 @@ final class TextInserter {
         guard let app = NSWorkspace.shared.frontmostApplication else { return false }
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
         var focusedValue: CFTypeRef?
-        return AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success && focusedValue != nil
+        guard AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
+              let focused = focusedValue,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else {
+            return false
+        }
+        let element = (focused as! AXUIElement)
+        return isEditableTextElement(element)
+    }
+
+    /// A-06: Pārbauda, vai fokusētais elements patiešām ir rediģējams teksta lauks,
+    /// nevis darbvirsma, logs, poga vai Finder mape.
+    private func isEditableTextElement(_ element: AXUIElement) -> Bool {
+        // 1. Pārbaudām lomu (role)
+        var roleValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
+           let role = roleValue as? String {
+            let textRoles: Set<String> = [
+                kAXTextFieldRole as String,
+                kAXTextAreaRole as String,
+                kAXComboBoxRole as String
+            ]
+            if textRoles.contains(role) {
+                return true
+            }
+        }
+
+        // 2. Ja loma nav standarta teksta lauks (piem., tīmekļa skats vai pielāgots redaktors),
+        // pārbaudām, vai kAXValueAttribute ir maināms
+        var isSettable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &isSettable) == .success,
+           isSettable.boolValue {
+            return true
+        }
+
+        // 3. Pārbaudām, vai elementam ir aktīvs kursora/atlases diapazons
+        var rangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
+           rangeRef != nil {
+            return true
+        }
+
+        return false
     }
 
     // MARK: - Accessibility (tieša ievietošana)
@@ -52,10 +93,11 @@ final class TextInserter {
 
         var focusedValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focused = focusedValue else {
+              let focused = focusedValue,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else {
             return false
         }
-        let element = focused as! AXUIElement
+        let element = (focused as! AXUIElement)
 
         // Izlasi pašreizējo izvēlēto diapazonu un tekstu.
         var rangeRef: CFTypeRef?
@@ -67,9 +109,10 @@ final class TextInserter {
         var newValue: String
         if hasRange, hasValue,
            let rangeValue = rangeRef,
+           CFGetTypeID(rangeValue) == AXValueGetTypeID(),
            let current = valueRef as? String {
             var range = CFRange(location: 0, length: 0)
-            AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
+            guard AXValueGetValue(rangeValue as! AXValue, .cfRange, &range) else { return false }
             let nsRange = NSRange(location: range.location, length: range.length)
             guard nsRange.location != NSNotFound,
                   nsRange.location <= (current as NSString).length,

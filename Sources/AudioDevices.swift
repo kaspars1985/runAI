@@ -77,8 +77,10 @@ enum AudioDevices {
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr, size > 0 else { return false }
 
-        let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-        defer { bufferList.deallocate() }
+        // A-07: Droša mainīga izmēra alokācija, novēršot bufera pārpildi
+        let rawPtr = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { rawPtr.deallocate() }
+        let bufferList = rawPtr.bindMemory(to: AudioBufferList.self, capacity: 1)
         guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, bufferList) == noErr else { return false }
         let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
         for buffer in buffers where buffer.mNumberChannels > 0 {

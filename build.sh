@@ -42,18 +42,28 @@ cp Resources/AppIcon_master.png "$APP/Contents/Resources/AppIcon.png"
 echo "==> Kopē whisper.framework…"
 cp -R Frameworks/whisper.framework "$APP/Contents/Frameworks/"
 
-echo "==> Paraksta whisper.framework (ad-hoc)…"
-codesign --force --sign - "$APP/Contents/Frameworks/whisper.framework"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-"-"}"
 
-echo "==> Paraksta runAI.app (ad-hoc, stabila designated requirement)…"
-# Svarīgi: norādām skaidru designated requirement, lai macOS TCC (Universālā piekļuve)
-# piesaistītu atļauju identifikatoram, nevis īslaicīgajam CDHash.
-# Bez tā katrs pārbūvējums rada jaunu CDHash un tccd atsaka atļauju:
-#   "Failed to match existing code requirement for subject lv.runai.app ..."
-codesign --force --sign - \
-  --identifier "lv.runai.app" \
-  -r='designated => identifier "lv.runai.app"' \
-  "$APP"
+if [ "$SIGNING_IDENTITY" != "-" ]; then
+  echo "==> Paraksta whisper.framework ar Developer ID un Hardened Runtime…"
+  codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP/Contents/Frameworks/whisper.framework"
+
+  echo "==> Paraksta runAI.app ar Developer ID ($SIGNING_IDENTITY)…"
+  codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
+    --identifier "lv.runai.app" \
+    "$APP"
+else
+  echo "==> Paraksta whisper.framework (ad-hoc)…"
+  codesign --force --sign - "$APP/Contents/Frameworks/whisper.framework"
+
+  echo "==> Paraksta runAI.app (ad-hoc, stabila designated requirement)…"
+  # Svarīgi: norādām skaidru designated requirement, lai macOS TCC (Universālā piekļuve)
+  # piesaistītu atļauju identifikatoram, nevis īslaicīgajam CDHash.
+  codesign --force --sign - \
+    --identifier "lv.runai.app" \
+    -r='designated => identifier "lv.runai.app"' \
+    "$APP"
+fi
 
 echo ""
 echo "Gatavs: $APP"

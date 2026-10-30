@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     @Published var isCapturingHotkey: Bool = false
     @Published var menuBarIconStyle: MenuBarIconStyle = .waveform
     @Published var appTheme: AppTheme = .system
+    @Published var autoCheckUpdates: Bool = true
 
     let modelManager = ModelManager()
     let updateChecker = UpdateChecker()
@@ -73,6 +74,11 @@ final class AppState: ObservableObject {
         } else {
             appTheme = .system
         }
+        if UserDefaults.standard.object(forKey: "autoCheckUpdates") != nil {
+            autoCheckUpdates = UserDefaults.standard.bool(forKey: "autoCheckUpdates")
+        } else {
+            autoCheckUpdates = true
+        }
 
         // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
         if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
@@ -92,6 +98,7 @@ final class AppState: ObservableObject {
 
         monitor.onPress = { [weak self] in self?.startRecording() }
         monitor.onRelease = { [weak self] in self?.stopRecordingAndTranscribe() }
+        monitor.onCancel = { [weak self] in self?.cancelRecording() }
         recorder.onLevel = { [weak self] level in self?.hud.updateLevel(level) }
 
         // Piemēro izvēlēto izskata tēmu
@@ -115,9 +122,11 @@ final class AppState: ObservableObject {
             self?.autoRequestMicrophoneIfNeeded()
         }
 
-        // Pārbauda atjauninājumus fonā
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            self?.updateChecker.checkForUpdates(manual: false)
+        // A-10: Pārbauda atjauninājumus fonā tikai tad, ja tas ir iespējots
+        if autoCheckUpdates {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.updateChecker.checkForUpdates(manual: false)
+            }
         }
 
         // Ielādē izvēlēto modeli fonā
@@ -140,6 +149,10 @@ final class AppState: ObservableObject {
 
     func startRecording() {
         guard !isCapturingHotkey else { return }
+        guard status != .transcribing else {
+            AppLogger.warn("startRecording: transkripcija jau notiek, ignorējam jaunu sākumu")
+            return
+        }
 
         if !engine.isLoaded {
             AppLogger.warn("startRecording: modelis vēl nav ielādēts")
@@ -196,6 +209,17 @@ final class AppState: ObservableObject {
                 self.finishTranscription(text: nil, error: err.localizedDescription)
             }
         }
+    }
+
+    /// A-05: Atceļ aktīvo ierakstu (piemēram, ja lietotājs turot Option nospieda citu taustiņu)
+    func cancelRecording() {
+        guard recorder.isRunning else { return }
+        AppLogger.info("cancelRecording: ieraksts atcelts")
+        recorder.stop()
+        _ = recorder.takeSamples() // Nometam paraugus
+        hudHideWork?.cancel()
+        hud.hide()
+        status = engine.isLoaded ? .ready : .needsModel
     }
 
     private func finishTranscription(text: String?, outcome: TextInserter.InsertOutcome = .insertedDirectly, error: String?) {
@@ -349,6 +373,11 @@ final class AppState: ObservableObject {
         appTheme = theme
         NSApp.appearance = theme.nsAppearance
         SettingsWindowController.shared.updateAppearance(theme.nsAppearance)
+    }
+
+    func setAutoCheckUpdates(_ enabled: Bool) {
+        autoCheckUpdates = enabled
+        UserDefaults.standard.set(enabled, forKey: "autoCheckUpdates")
     }
 
     func setHotkey(_ h: Hotkey) {
@@ -512,9 +541,7 @@ final class AppState: ObservableObject {
         permissionTimer?.invalidate()
         permissionTimer = nil
         monitor?.stop()
-        if recorder.isRunning {
-            recorder.stop()
-        }
+        recorder.tearDown()
         engine.unload()
         UserDefaults.standard.synchronize()
         AppLogger.flush()

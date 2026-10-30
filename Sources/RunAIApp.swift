@@ -267,6 +267,17 @@ private struct MenuBarRowButton: View {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A-04: Vienas instances kontrole — neļaujam darboties diviem runAI procesiem vienlaikus
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        let bundleID = Bundle.main.bundleIdentifier ?? "lv.runai.app"
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        if let otherApp = running.first(where: { $0.processIdentifier != myPID }) {
+            AppLogger.warn("applicationDidFinishLaunching: jau darbojas cita runAI instance (PID=\(otherApp.processIdentifier)); izejam")
+            otherApp.activate()
+            NSApp.terminate(nil)
+            return
+        }
+
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.setup()
 

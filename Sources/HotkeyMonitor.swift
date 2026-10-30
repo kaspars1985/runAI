@@ -6,6 +6,7 @@ import CoreGraphics
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
+    var onCancel: (() -> Void)?
     /// Kad uzstādīts — monitors darbojas "tveršanas" režīmā un atgriež nospiesto taustiņu.
     var onCaptured: ((Hotkey?) -> Void)?
 
@@ -14,6 +15,7 @@ final class HotkeyMonitor {
     private(set) var isDown = false
     private var hotkey: Hotkey
     private var captureModifierKey: UInt16?
+    private var cancelledByCompoundKey = false
 
     /// Vai event tap šobrīd ir aktīvs (t.i., start() izdevās).
     var isRunning: Bool { tap != nil }
@@ -184,34 +186,37 @@ final class HotkeyMonitor {
         let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
 
         if hotkey.isModifierOnly {
+            // A-05: Ja lietotājs, turot modifikatoru, nospiež kādu parastu taustiņu (piem., ⌥ + ←, ⌥ + ⌫),
+            // atceļam diktēšanu, lai netraucētu sistēmas saīsnēm.
+            if type == .keyDown && isDown {
+                cancelledByCompoundKey = true
+                isDown = false
+                AppLogger.info("HotkeyMonitor: diktēšana atcelta (salikts taustiņš keyCode=\(keyCode))")
+                DispatchQueue.main.async { [weak self] in self?.onCancel?() }
+                return false
+            }
+
             guard type == .flagsChanged else { return false }
 
-            // Atbalstām gan kreiso, gan labo modifikatoru taustiņu (piem., kreisais vai labais ⌥ Option)
-            let matchesKey: Bool
-            switch hotkey.keyCode {
-            case 0x3A, 0x3D: // Option (Kreisais: 0x3A, Labais: 0x3D)
-                matchesKey = (keyCode == 0x3A || keyCode == 0x3D)
-            case 0x37, 0x36: // Command (Kreisais: 0x37, Labais: 0x36)
-                matchesKey = (keyCode == 0x37 || keyCode == 0x36)
-            case 0x38, 0x3C: // Shift (Kreisais: 0x38, Labais: 0x3C)
-                matchesKey = (keyCode == 0x38 || keyCode == 0x3C)
-            case 0x3B, 0x3E: // Control (Kreisais: 0x3B, Labais: 0x3E)
-                matchesKey = (keyCode == 0x3B || keyCode == 0x3E)
-            default:
-                matchesKey = (keyCode == hotkey.keyCode)
-            }
+            // A-05: Atšķiram kreiso un labo modifikatora taustiņu (precīzs keyCode)
+            let matchesKey = (keyCode == hotkey.keyCode)
             guard matchesKey else { return false }
 
             guard let flag = hotkey.modifierFlag else { return false }
             let hasFlag = event.flags.contains(flag)
             if hasFlag && !isDown {
+                cancelledByCompoundKey = false
                 isDown = true
                 AppLogger.info("HotkeyMonitor: hotkey press (modifier keyCode=\(keyCode))")
                 DispatchQueue.main.async { [weak self] in self?.onPress?() }
-            } else if !hasFlag && isDown {
+            } else if !hasFlag {
+                if isDown && !cancelledByCompoundKey {
+                    isDown = false
+                    AppLogger.info("HotkeyMonitor: hotkey release (modifier keyCode=\(keyCode))")
+                    DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+                }
                 isDown = false
-                AppLogger.info("HotkeyMonitor: hotkey release (modifier keyCode=\(keyCode))")
-                DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+                cancelledByCompoundKey = false
             }
             return false
         }
