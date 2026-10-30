@@ -70,6 +70,11 @@ final class AppState: ObservableObject {
         } else {
             appTheme = .system
         }
+
+        // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
+        if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
+            selectedInputID = AudioDevices.defaultInputUID()
+        }
     }
 
     func setup() {
@@ -164,6 +169,7 @@ final class AppState: ObservableObject {
         AppLogger.info("stopRecordingAndTranscribe: aptur ierakstu, sāk atšifrēšanu")
         recorder.stop()
         let samples = recorder.takeSamples()
+        AppLogger.info("stopRecordingAndTranscribe: samples=\(samples.count)")
         status = .transcribing
         showHUD(text: status.hudText)
 
@@ -364,6 +370,9 @@ final class AppState: ObservableObject {
         inputDevices = AudioDevices.listInputDevices()
         let defaultUID = AudioDevices.defaultInputUID()
         if selectedInputID == nil {
+            selectedInputID = defaultUID
+        } else if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
+            // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz noklusēto.
             selectedInputID = defaultUID
         }
     }

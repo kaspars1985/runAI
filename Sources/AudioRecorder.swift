@@ -4,18 +4,22 @@ import AudioToolbox
 
 /// Tver mikrofonu, pārveido uz 16 kHz / mono / float32 un uzkrāj paraugus.
 final class AudioRecorder {
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine?
     private var converter: AVAudioConverter?
     private let targetFormat: AVAudioFormat
     private let queue = DispatchQueue(label: "lv.runai.audio")
     private let sampleRate: Double = 16000
     private var isTapped = false
+    private var currentDeviceUID: String?
+    private var configObserver: NSObjectProtocol?
 
     private(set) var samples: [Float] = []
     /// Mikrofona līmenis (0…1), tiek izsaukts galvenajā pavedienā.
     var onLevel: ((Float) -> Void)?
 
-    var isRunning: Bool { engine.isRunning }
+    /// Seko līdzi, vai ieraksts ir aktīvs. Tiek uzturēts atsevišķi no engine.isRunning,
+    /// jo CoreAudio var īslaicīgi atiestatīt engine Bluetooth frekvenču maiņas laikā.
+    private(set) var isRunning: Bool = false
 
     init() {
         targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
@@ -25,40 +29,127 @@ final class AudioRecorder {
     }
 
     func start() throws {
-        guard !engine.isRunning else { return }
+        guard !isRunning else { return }
         queue.sync {
             samples.removeAll(keepingCapacity: true)
         }
         converter = nil
-        let input = engine.inputNode
+        isRunning = true
 
-        if isTapped {
-            input.removeTap(onBus: 0)
-            isTapped = false
+        do {
+            try startEngine(applyDeviceUID: true)
+        } catch {
+            AppLogger.warn("AudioRecorder.start: pirmais mēģinājums neizdevās (\(error.localizedDescription)); mēģina ar sistēmas noklusēto ievadi")
+            do {
+                try startEngine(applyDeviceUID: false)
+            } catch {
+                isRunning = false
+                throw error
+            }
         }
-        let hwFormat = input.outputFormat(forBus: 0)
-        AppLogger.info("AudioRecorder.start: hwFormat sampleRate=\(hwFormat.sampleRate) channels=\(hwFormat.channelCount)")
+        AppLogger.info("AudioRecorder.start: AVAudioEngine veiksmīgi palaists")
+    }
 
-        // format: nil ļauj AVAudioInputNode izmantot faktisko aparatūras formātu,
-        // novēršot Objective-C NSException pie Bluetooth/AirPods frekvenču maiņas.
+    private func startEngine(applyDeviceUID: Bool) throws {
+        // Vispirms sakopjam iepriekšējo engine, ja tāds bija aktīvs
+        if let oldEng = self.engine {
+            if isTapped {
+                oldEng.inputNode.removeTap(onBus: 0)
+                isTapped = false
+            }
+            if oldEng.isRunning {
+                oldEng.stop()
+            }
+            self.engine = nil
+        }
+
+        // Jauna AVAudioEngine instance katrā palaišanā — novērš novecojušu
+        // kešoto outputFormat (piem., 48000 Hz, kamēr Bluetooth pārslēdzas uz 24000 Hz).
+        let eng = AVAudioEngine()
+        self.engine = eng
+
+        if applyDeviceUID, let uid = currentDeviceUID {
+            let defaultUID = AudioDevices.defaultInputUID()
+            if uid != defaultUID, let deviceID = AudioDevices.deviceID(forUID: uid) {
+                var deviceIDValue = deviceID
+                if let audioUnit = eng.inputNode.audioUnit {
+                    let status = AudioUnitSetProperty(audioUnit,
+                                                      kAudioOutputUnitProperty_CurrentDevice,
+                                                      kAudioUnitScope_Global,
+                                                      0,
+                                                      &deviceIDValue,
+                                                      UInt32(MemoryLayout<AudioDeviceID>.size))
+                    if status != noErr {
+                        AppLogger.warn("AudioRecorder.startEngine: AudioUnitSetProperty neizdevās (status=\(status))")
+                    } else {
+                        eng.reset()
+                    }
+                }
+            }
+        }
+
+        let input = eng.inputNode
+        let hwFormat = input.inputFormat(forBus: 0)
+        let outFormat = input.outputFormat(forBus: 0)
+        AppLogger.info("AudioRecorder.startEngine: hwFormat sampleRate=\(hwFormat.sampleRate) channels=\(hwFormat.channelCount); outFormat sampleRate=\(outFormat.sampleRate) channels=\(outFormat.channelCount)")
+
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.process(buffer)
         }
         isTapped = true
-        engine.prepare()
-        try engine.start()
-        AppLogger.info("AudioRecorder.start: AVAudioEngine veiksmīgi palaists")
+
+        eng.prepare()
+        try eng.start()
+
+        // Uzklausām konfigurācijas izmaiņas (piem., AirPods pārslēdzas 48kHz → 24kHz ieraksta laikā).
+        if let existing = configObserver {
+            NotificationCenter.default.removeObserver(existing)
+            configObserver = nil
+        }
+        configObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: eng,
+            queue: nil) { [weak self] _ in
+                self?.handleConfigurationChange()
+            }
+    }
+
+    private func handleConfigurationChange() {
+        guard isRunning else { return }
+        AppLogger.info("AudioRecorder: AVAudioEngineConfigurationChange — pārstartē engine")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.isRunning else { return }
+            do {
+                try self.startEngine(applyDeviceUID: true)
+                AppLogger.info("AudioRecorder: engine veiksmīgi pārstartēts pēc konfigurācijas maiņas")
+            } catch {
+                AppLogger.warn("AudioRecorder: pārstartēšana ar izvēlēto ierīci neizdevās (\(error.localizedDescription)); mēģina ar noklusēto")
+                do {
+                    try self.startEngine(applyDeviceUID: false)
+                    AppLogger.info("AudioRecorder: engine veiksmīgi pārstartēts ar noklusēto ierīci")
+                } catch {
+                    AppLogger.error("AudioRecorder: engine pārstartēšana neizdevās: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     func stop() {
-        guard engine.isRunning || isTapped else { return }
-        if isTapped {
-            engine.inputNode.removeTap(onBus: 0)
-            isTapped = false
+        if let observer = configObserver {
+            NotificationCenter.default.removeObserver(observer)
+            configObserver = nil
         }
-        if engine.isRunning {
-            engine.stop()
+        if let eng = engine {
+            if isTapped {
+                eng.inputNode.removeTap(onBus: 0)
+                isTapped = false
+            }
+            if eng.isRunning {
+                eng.stop()
+            }
         }
+        engine = nil
+        isRunning = false
         AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
@@ -73,16 +164,7 @@ final class AudioRecorder {
 
     /// Izvēlas konkrētu ievades ierīci pēc UID (pirms start()). Ja neizdodas — izmanto sistēmas noklusēto.
     func setInputDeviceUID(_ uid: String?) {
-        guard let uid = uid, let deviceID = AudioDevices.deviceID(forUID: uid) else { return }
-        var deviceIDValue = deviceID
-        let audioUnit = engine.inputNode.audioUnit
-        guard let audioUnit = audioUnit else { return }
-        AudioUnitSetProperty(audioUnit,
-                             kAudioOutputUnitProperty_CurrentDevice,
-                             kAudioUnitScope_Global,
-                             0,
-                             &deviceIDValue,
-                             UInt32(MemoryLayout<AudioDeviceID>.size))
+        currentDeviceUID = uid
     }
 
     private func process(_ buffer: AVAudioPCMBuffer) {

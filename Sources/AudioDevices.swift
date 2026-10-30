@@ -24,7 +24,13 @@ enum AudioDevices {
 
         for id in ids {
             guard hasInputChannels(id), let name = deviceName(id) else { continue }
-            result.append(AudioDevice(id: deviceUID(id) ?? String(id), name: name))
+            let uid = deviceUID(id) ?? String(id)
+            // Izlaižam AVAudioEngine virtuālos/iekšējos apvienotos agregātus,
+            // lai tie nekad neparādās mikrofona izvēlnē.
+            if name.contains("CADefaultDeviceAggregate") || uid.contains("CADefaultDeviceAggregate") {
+                continue
+            }
+            result.append(AudioDevice(id: uid, name: name))
         }
         return result
     }
