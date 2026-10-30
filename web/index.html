@@ -266,6 +266,305 @@
       40%  { transform: translateX(180%) skewX(-22deg); opacity: 0; }
       100% { transform: translateX(180%) skewX(-22deg); opacity: 0; }
     }
+
+    /* ===== Voice -> Text Morph Showcase Stage ===== */
+    .vm-stage {
+      --vm-surface: #14161d;
+      --vm-surface-2: #0b0d13;
+      --vm-border: rgba(255, 255, 255, 0.08);
+      --vm-border-strong: rgba(255, 255, 255, 0.15);
+      --vm-text: #f4f6fb;
+      --vm-text-dim: #8b90a0;
+      --vm-cyan: #22d3ee;
+      --vm-blue: #3b82f6;
+      --vm-purple: #8b5cf6;
+      --vm-pink: #ec4899;
+      --vm-emerald: #10b981;
+
+      position: relative;
+      width: 100%;
+      margin-top: 1.5rem;
+      border-radius: 1.25rem;
+      background:
+        radial-gradient(120% 140% at 10% 0%, rgba(34, 211, 238, 0.08), transparent 55%),
+        radial-gradient(120% 140% at 90% 100%, rgba(236, 72, 153, 0.08), transparent 55%),
+        linear-gradient(180deg, #161923 0%, var(--vm-surface) 45%, var(--vm-surface-2) 100%);
+      border: 1px solid var(--vm-border);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        0 28px 70px -24px rgba(0, 0, 0, 0.78),
+        0 0 50px -15px rgba(59, 130, 246, 0.16);
+      overflow: hidden;
+      isolation: isolate;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+    .vm-stage:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.07) inset,
+        0 32px 80px -22px rgba(0, 0, 0, 0.85),
+        0 0 65px -10px rgba(56, 189, 248, 0.24);
+    }
+
+    .vm-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(55% 45% at 50% 0%, rgba(59, 130, 246, 0.12), transparent 70%),
+        radial-gradient(55% 40% at 50% 100%, rgba(168, 85, 247, 0.08), transparent 70%);
+      z-index: 0;
+    }
+
+    .vm-stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(85% 85% at 50% 50%, #000 35%, transparent 100%);
+      -webkit-mask-image: radial-gradient(85% 85% at 50% 50%, #000 35%, transparent 100%);
+      opacity: 0.55;
+      z-index: 0;
+    }
+
+    .vm-hud {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 20px;
+      border-bottom: 1px solid var(--vm-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+    }
+
+    .vm-hud-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .vm-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px 5px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--vm-border-strong);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: var(--vm-text);
+      white-space: nowrap;
+      transition: all 0.35s ease;
+    }
+
+    .vm-pill[data-state="recording"] {
+      background: rgba(236, 72, 153, 0.12);
+      border-color: rgba(236, 72, 153, 0.4);
+      color: #ffd6ea;
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.18);
+    }
+    .vm-pill[data-state="processing"] {
+      background: rgba(34, 211, 238, 0.12);
+      border-color: rgba(34, 211, 238, 0.4);
+      color: #cffafe;
+      box-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
+    }
+    .vm-pill[data-state="done"] {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #d1fae5;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.18);
+    }
+
+    .vm-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--vm-text-dim);
+      transition: background 0.3s ease;
+      flex: 0 0 auto;
+    }
+    .vm-pill[data-state="recording"] .vm-dot {
+      background: var(--vm-pink);
+      animation: vm-pulse-pink 1.05s ease-in-out infinite;
+    }
+    .vm-pill[data-state="processing"] .vm-dot {
+      background: var(--vm-cyan);
+      animation: vm-pulse-cyan 0.75s ease-in-out infinite;
+    }
+    .vm-pill[data-state="done"] .vm-dot {
+      background: var(--vm-emerald);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.85);
+    }
+
+    @keyframes vm-pulse-pink {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.65); }
+      50%      { box-shadow: 0 0 0 6px rgba(236, 72, 153, 0); }
+    }
+    @keyframes vm-pulse-cyan {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.65); }
+      50%      { box-shadow: 0 0 0 6px rgba(34, 211, 238, 0); }
+    }
+
+    .vm-timer {
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 11.5px;
+      color: var(--vm-text-dim);
+      letter-spacing: 0.03em;
+      transition: opacity 0.3s ease;
+    }
+
+    .vm-replay {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--vm-border);
+      color: var(--vm-text-dim);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .vm-replay:hover {
+      color: #fff;
+      border-color: var(--vm-border-strong);
+      background: rgba(255, 255, 255, 0.07);
+    }
+    .vm-replay svg {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .vm-stage:hover .vm-replay svg {
+      transform: rotate(-45deg);
+    }
+
+    .vm-main {
+      position: relative;
+      z-index: 2;
+      height: 185px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .vm-canvas-wrap {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .vm-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .vm-text-layer {
+      position: relative;
+      z-index: 3;
+      width: 100%;
+      max-width: 780px;
+      margin: 0 auto;
+      text-align: center;
+      font-size: clamp(19px, 2.55vw, 29px);
+      line-height: 1.38;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: #ffffff;
+      pointer-events: none;
+      transition: text-shadow 0.5s ease;
+    }
+    .vm-text-layer[data-glow="true"] {
+      text-shadow:
+        0 0 28px rgba(34, 211, 238, 0.24),
+        0 0 60px rgba(139, 92, 246, 0.16);
+    }
+
+    .vm-word {
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    .vm-char {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity, filter, color, text-shadow;
+      transform-origin: 50% 55%;
+      color: #ffffff;
+      opacity: 0;
+    }
+    .vm-char[data-space="true"] {
+      width: 0.28em;
+    }
+
+    .vm-caret {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 2.5px;
+      height: 1.12em;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #67e8f9, #3b82f6, #ec4899);
+      box-shadow:
+        0 0 10px rgba(34, 211, 238, 0.95),
+        0 0 22px rgba(59, 130, 246, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      will-change: transform, opacity;
+      transition: opacity 0.18s ease;
+    }
+    .vm-caret[data-visible="true"] { opacity: 1; }
+    .vm-caret[data-blink="true"] { animation: vm-blink 1s steps(1, end) infinite; }
+
+    @keyframes vm-blink {
+      0%, 49%   { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* Step cards active synchronization glow */
+    .step-card-sync {
+      transition: border-color 0.4s ease, box-shadow 0.4s ease, background-color 0.4s ease, transform 0.4s ease;
+    }
+    .step-card-sync[data-active="blue"] {
+      border-color: rgba(59, 130, 246, 0.45);
+      background-color: rgba(59, 130, 246, 0.05);
+      box-shadow: 0 0 30px -8px rgba(59, 130, 246, 0.25);
+      transform: translateY(-2px);
+    }
+    .step-card-sync[data-active="purple"] {
+      border-color: rgba(168, 85, 247, 0.45);
+      background-color: rgba(168, 85, 247, 0.05);
+      box-shadow: 0 0 30px -8px rgba(168, 85, 247, 0.25);
+      transform: translateY(-2px);
+    }
+    .step-card-sync[data-active="emerald"] {
+      border-color: rgba(16, 185, 129, 0.45);
+      background-color: rgba(16, 185, 129, 0.05);
+      box-shadow: 0 0 30px -8px rgba(16, 185, 129, 0.25);
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 640px) {
+      .vm-main { height: 165px; padding: 0 16px; }
+      .vm-hud { padding: 11px 14px; }
+    }
   </style>
 </head>
 <body class="bg-surface-canvas text-zinc-100 antialiased selection:bg-blue-600 selection:text-white">
@@ -703,7 +1002,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
         
         <!-- Step 1 -->
-        <div class="p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
+        <div id="step-card-1" class="step-card-sync p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
           <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-mono font-bold mb-4">
             ⌥
           </div>
@@ -712,7 +1011,7 @@
         </div>
 
         <!-- Step 2 -->
-        <div class="p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
+        <div id="step-card-2" class="step-card-sync p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
           <div class="h-12 flex items-center gap-1.5 px-4 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 mb-4">
             <span class="w-1 bg-purple-400 rounded-full wave-bar" style="animation-delay: 0.1s"></span>
             <span class="w-1 bg-purple-400 rounded-full wave-bar" style="animation-delay: 0.3s"></span>
@@ -725,7 +1024,7 @@
         </div>
 
         <!-- Step 3 -->
-        <div class="p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
+        <div id="step-card-3" class="step-card-sync p-6 rounded-xl border border-surface-border bg-white/[0.02] flex flex-col items-center text-center">
           <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold mb-4">
             ↵
           </div>
@@ -733,6 +1032,33 @@
           <p class="text-xs text-zinc-400">Atšifrēšana notiek acumirklī, un teksts tiek ievietots aktīvajā logā.</p>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Live Voice -> Text Morph Showcase Stage -->
+    <div class="vm-stage" id="vmStage" role="region" aria-label="Balss ieraksta pārvēršanās tekstā demonstrācija">
+      <div class="vm-hud">
+        <div class="vm-hud-left">
+          <span class="vm-pill" id="vmPill" data-state="recording">
+            <span class="vm-dot"></span>
+            <span id="vmPillText">⌥ Option turēts · Klausās balsi...</span>
+          </span>
+          <span class="vm-timer" id="vmTimer">00:00.0</span>
+        </div>
+        <button class="vm-replay" id="vmReplay" type="button" aria-label="Atskaņot animāciju vēlreiz">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7"/>
+            <path d="M3 4v5h5"/>
+          </svg>
+          <span>Atskaņot vēlreiz</span>
+        </button>
+      </div>
+
+      <div class="vm-main" id="vmMain">
+        <div class="vm-canvas-wrap">
+          <canvas class="vm-canvas" id="vmCanvas"></canvas>
+        </div>
+        <div class="vm-text-layer" id="vmTextLayer" data-glow="false" aria-live="polite"></div>
       </div>
     </div>
   </section>
@@ -963,6 +1289,604 @@
       } catch (err) {
         console.warn('Could not fetch latest release:', err);
       }
+    })();
+
+    /* ===== Voice -> Text Morph Showcase Engine ===== */
+    (function initVoiceMorphStage() {
+      const SENTENCE = "Šodien ir lieliska diena, lai uzsāktu kādu projektu";
+
+      const PHASE = {
+        RECORD: 3200,
+        MORPH: 1550,
+        HOLD: 3200,
+        DISSOLVE: 750
+      };
+      const TOTAL = PHASE.RECORD + PHASE.MORPH + PHASE.HOLD + PHASE.DISSOLVE;
+
+      // 8 rhythmic syllable bursts matching:
+      // "Šo-dien | ir | lie-lis-ka | die-na, | lai | uz-sāk-tu | kā-du | pro-jek-tu"
+      const BURSTS = [
+        [0.03, 0.14, 0.96],
+        [0.16, 0.23, 0.65],
+        [0.26, 0.40, 0.94],
+        [0.43, 0.54, 0.82],
+        [0.57, 0.64, 0.64],
+        [0.67, 0.79, 0.92],
+        [0.81, 0.88, 0.76],
+        [0.89, 0.98, 0.90]
+      ];
+
+      const stage = document.getElementById("vmStage");
+      const main = document.getElementById("vmMain");
+      const canvas = document.getElementById("vmCanvas");
+      const textLayer = document.getElementById("vmTextLayer");
+      const pill = document.getElementById("vmPill");
+      const pillText = document.getElementById("vmPillText");
+      const timerEl = document.getElementById("vmTimer");
+      const replayBtn = document.getElementById("vmReplay");
+      const step1 = document.getElementById("step-card-1");
+      const step2 = document.getElementById("step-card-2");
+      const step3 = document.getElementById("step-card-3");
+
+      if (!stage || !main || !canvas || !textLayer) return;
+      const ctx = canvas.getContext("2d", { alpha: true });
+
+      const charEls = [];
+      let caretEl = null;
+
+      function buildTextLayer() {
+        textLayer.innerHTML = "";
+        charEls.length = 0;
+
+        const words = SENTENCE.split(" ");
+        words.forEach((word, wIdx) => {
+          const wordSpan = document.createElement("span");
+          wordSpan.className = "vm-word";
+          for (let i = 0; i < word.length; i++) {
+            const span = document.createElement("span");
+            span.className = "vm-char";
+            span.textContent = word[i];
+            wordSpan.appendChild(span);
+            charEls.push(span);
+          }
+          textLayer.appendChild(wordSpan);
+
+          if (wIdx < words.length - 1) {
+            const spaceSpan = document.createElement("span");
+            spaceSpan.className = "vm-char";
+            spaceSpan.setAttribute("data-space", "true");
+            spaceSpan.textContent = "\u00A0";
+            textLayer.appendChild(spaceSpan);
+            charEls.push(spaceSpan);
+          }
+        });
+
+        caretEl = document.createElement("span");
+        caretEl.className = "vm-caret";
+        caretEl.setAttribute("data-visible", "false");
+        caretEl.setAttribute("data-blink", "false");
+        textLayer.appendChild(caretEl);
+      }
+
+      let dpr = 1;
+      let cssW = 0;
+      let cssH = 0;
+      let charMetrics = []; // { normX, rightX, topY, height } relative to textLayer
+
+      function measureChars() {
+        // Temporarily reset transform to get accurate layout coordinates
+        const savedTransforms = charEls.map((el) => el.style.transform);
+        charEls.forEach((el) => { el.style.transform = "none"; });
+
+        const layerRect = textLayer.getBoundingClientRect();
+        const mainRect = main.getBoundingClientRect();
+        const mainW = Math.max(1, mainRect.width);
+
+        let minX = Infinity;
+        let maxX = -Infinity;
+        const raw = charEls.map((el) => {
+          const r = el.getBoundingClientRect();
+          const cxMain = (r.left + r.width / 2) - mainRect.left;
+          if (cxMain < minX) minX = cxMain;
+          if (cxMain > maxX) maxX = cxMain;
+          return {
+            cxMain,
+            rightRel: r.right - layerRect.left,
+            topRel: r.top - layerRect.top,
+            height: r.height
+          };
+        });
+
+        const spanW = Math.max(1, maxX - minX);
+        charMetrics = raw.map((m, idx) => ({
+          // Mix horizontal position & sequence index so wrapped lines still reveal monotonically
+          normX: 0.06 + 0.86 * (0.65 * ((m.cxMain - minX) / spanW) + 0.35 * (idx / Math.max(1, charEls.length - 1))),
+          canvasNormX: m.cxMain / mainW,
+          rightRel: m.rightRel,
+          topRel: m.topRel,
+          height: m.height
+        }));
+
+        charEls.forEach((el, i) => { el.style.transform = savedTransforms[i]; });
+      }
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const rect = main.getBoundingClientRect();
+        cssW = Math.max(1, rect.width);
+        cssH = Math.max(1, rect.height);
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        canvas.style.width = cssW + "px";
+        canvas.style.height = cssH + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        measureChars();
+      }
+
+      function voiceEnvelope(p) {
+        if (p <= 0 || p >= 1) return 0.05;
+        let amp = 0;
+        for (let i = 0; i < BURSTS.length; i++) {
+          const [s, e, peak] = BURSTS[i];
+          if (p >= s && p <= e) {
+            const local = (p - s) / (e - s);
+            const bell = Math.sin(local * Math.PI);
+            const micro = 0.72 + 0.28 * Math.sin(local * Math.PI * 5 + i * 1.9);
+            amp = Math.max(amp, peak * bell * micro);
+          }
+        }
+        return amp + 0.06 + 0.03 * Math.sin(p * 85);
+      }
+
+      const particles = [];
+      const MAX_PARTICLES = 100;
+
+      function spawnParticle(x, y, intensity, burstMode) {
+        if (particles.length >= MAX_PARTICLES) return;
+        const angle = burstMode
+          ? (Math.random() - 0.5) * Math.PI * 1.4
+          : Math.random() * Math.PI * 2;
+        const speed = (burstMode ? 0.8 : 0.3) + Math.random() * 1.7 * intensity;
+        const r = Math.random();
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed * (burstMode ? 1.1 : 0.65),
+          vy: Math.sin(angle) * speed - (burstMode ? 0.2 : 0.35),
+          life: 1,
+          decay: 0.014 + Math.random() * 0.022,
+          size: 1.0 + Math.random() * 2.1,
+          hue: r < 0.4 ? "cyan" : (r < 0.75 ? "purple" : "pink")
+        });
+      }
+
+      function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.982;
+          p.vy *= 0.982;
+          p.life -= p.decay;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+      }
+
+      function drawParticles() {
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const a = Math.max(0, p.life);
+          let color;
+          if (p.hue === "cyan") color = `rgba(34, 211, 238, ${a})`;
+          else if (p.hue === "purple") color = `rgba(139, 92, 246, ${a})`;
+          else color = `rgba(236, 72, 153, ${a})`;
+          ctx.beginPath();
+          ctx.fillStyle = color;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 10 * a;
+          ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+
+      function roundRect(c, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        c.beginPath();
+        c.moveTo(x + r, y);
+        c.lineTo(x + w - r, y);
+        c.quadraticCurveTo(x + w, y, x + w, y + r);
+        c.lineTo(x + w, y + h - r);
+        c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        c.lineTo(x + r, y + h);
+        c.quadraticCurveTo(x, y + h, x, y + h - r);
+        c.lineTo(x, y + r);
+        c.quadraticCurveTo(x, y, x + r, y);
+        c.closePath();
+      }
+
+      const BAR_COUNT = 68;
+
+      function drawScene(now, phase, phaseProgress, scanPos) {
+        const w = cssW;
+        const h = cssH;
+        const cy = h / 2;
+
+        ctx.clearRect(0, 0, w, h);
+
+        let ampAtX;
+        let compressAtX;
+        let flareAtX;
+
+        if (phase === "record") {
+          const env = voiceEnvelope(phaseProgress);
+          ampAtX = (nx) => {
+            const centerBell = Math.sin(nx * Math.PI);
+            const traveling = 0.65 + 0.35 * Math.sin(nx * 18 - now * 0.009);
+            return env * (0.3 + 0.7 * centerBell) * traveling;
+          };
+          compressAtX = () => 0;
+          flareAtX = () => 0;
+        } else if (phase === "morph") {
+          const scan = scanPos;
+          ampAtX = (nx) => {
+            if (nx < scan - 0.08) return 0;
+            const centerBell = Math.sin(nx * Math.PI);
+            return 0.72 * (0.35 + 0.65 * centerBell) * (0.75 + 0.25 * Math.sin(now * 0.01 + nx * 22));
+          };
+          compressAtX = (nx) => {
+            if (nx > scan) return 0;
+            const d = scan - nx;
+            return Math.min(1, d * 10.5);
+          };
+          flareAtX = (nx) => {
+            const d = Math.abs(nx - scan);
+            return Math.max(0, 1 - d * 13);
+          };
+        } else if (phase === "hold") {
+          ampAtX = () => 0;
+          compressAtX = () => 1;
+          flareAtX = () => 0;
+        } else {
+          // dissolve back to gentle idle wave
+          const emerge = phaseProgress;
+          ampAtX = (nx) => 0.18 * emerge * Math.sin(nx * Math.PI);
+          compressAtX = () => 1 - emerge;
+          flareAtX = () => 0;
+        }
+
+        // 1. Harmonic glowing ribbons
+        const ribbonConfigs = [
+          { c1: "rgba(34, 211, 238, 0.85)", c2: "rgba(34, 211, 238, 0)", freq: 2.3, speed: 0.0042, offset: 0.0, width: 2.4 },
+          { c1: "rgba(99, 102, 241, 0.80)", c2: "rgba(99, 102, 241, 0)", freq: 3.1, speed: -0.0036, offset: 2.1, width: 2.0 },
+          { c1: "rgba(236, 72, 153, 0.80)", c2: "rgba(236, 72, 153, 0)", freq: 3.9, speed: 0.0048, offset: 4.2, width: 1.8 }
+        ];
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let r = 0; r < ribbonConfigs.length; r++) {
+          const cfg = ribbonConfigs[r];
+          ctx.beginPath();
+          const steps = 130;
+          for (let i = 0; i <= steps; i++) {
+            const nx = i / steps;
+            const x = nx * w;
+            const amp = ampAtX(nx);
+            const comp = compressAtX(nx);
+            const flare = flareAtX(nx);
+
+            const s1 = Math.sin(nx * Math.PI * cfg.freq + now * cfg.speed + cfg.offset);
+            const s2 = Math.cos(nx * Math.PI * (cfg.freq * 1.8) - now * cfg.speed * 1.4 + cfg.offset);
+            const wave = s1 * 0.68 + s2 * 0.32;
+
+            const maxRibbonAmp = (34 + r * 8) * (0.2 + amp * 1.35);
+            let y = cy + wave * maxRibbonAmp * (1 - comp);
+
+            if (flare > 0) {
+              y += Math.sin(nx * 45 + now * 0.025) * flare * 9 * (1 - comp * 0.5);
+            }
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+
+          const grad = ctx.createLinearGradient(0, 0, w, 0);
+          grad.addColorStop(0, cfg.c2);
+          grad.addColorStop(0.12, cfg.c1);
+          grad.addColorStop(0.88, cfg.c1);
+          grad.addColorStop(1, cfg.c2);
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = cfg.width;
+          ctx.shadowColor = cfg.c1;
+          ctx.shadowBlur = 14;
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // 2. Vertical spectral frequency bars
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        const barAreaW = w * 0.88;
+        const barStartX = (w - barAreaW) / 2;
+        const barGap = barAreaW / BAR_COUNT;
+        const barW = Math.max(2.2, barGap * 0.52);
+        const maxBarH = h * 0.54;
+
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const nx = (i + 0.5) / BAR_COUNT;
+          const x = barStartX + i * barGap + barGap / 2;
+          const amp = ampAtX(nx);
+          const comp = compressAtX(nx);
+          const flare = flareAtX(nx);
+
+          if (comp >= 0.98 && flare <= 0.02) continue;
+
+          const seed = Math.sin(i * 12.9898) * 43758.5453;
+          const rand = seed - Math.floor(seed);
+          const harmonic = 0.55 + 0.45 * Math.sin(now * 0.0085 + i * 0.65 + rand * 5);
+
+          let barH = maxBarH * amp * harmonic * (0.55 + rand * 0.65);
+          barH = Math.max(3, barH);
+          barH *= (1 - comp * 0.96);
+
+          if (flare > 0) {
+            barH += flare * 24 * (1 - comp * 0.4);
+          }
+
+          const y = cy - barH / 2;
+          const alphaScale = Math.max(0, 1 - comp * 0.95);
+
+          let colTop, colMid, colBot;
+          if (nx < 0.35) {
+            colTop = `rgba(103, 232, 249, ${0.92 * alphaScale})`;
+            colMid = `rgba(34, 211, 238, ${0.85 * alphaScale})`;
+            colBot = `rgba(59, 130, 246, ${0.45 * alphaScale})`;
+          } else if (nx < 0.68) {
+            colTop = `rgba(147, 197, 253, ${0.92 * alphaScale})`;
+            colMid = `rgba(99, 102, 241, ${0.85 * alphaScale})`;
+            colBot = `rgba(168, 85, 247, ${0.45 * alphaScale})`;
+          } else {
+            colTop = `rgba(240, 171, 252, ${0.92 * alphaScale})`;
+            colMid = `rgba(236, 72, 153, ${0.85 * alphaScale})`;
+            colBot = `rgba(244, 114, 182, ${0.45 * alphaScale})`;
+          }
+
+          const grad = ctx.createLinearGradient(0, y, 0, y + barH);
+          grad.addColorStop(0, colTop);
+          grad.addColorStop(0.5, colMid);
+          grad.addColorStop(1, colBot);
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = colMid;
+          ctx.shadowBlur = 6 + flare * 18;
+
+          roundRect(ctx, x - barW / 2, y, barW, barH, barW / 2);
+          ctx.fill();
+
+          if (phase === "record" && amp > 0.52 && Math.random() < 0.06) {
+            spawnParticle(x, y, amp, false);
+            spawnParticle(x, y + barH, amp, false);
+          }
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // 3. Morph Energy Scanline Beam
+        if (phase === "morph" && scanPos > 0.01 && scanPos < 0.99) {
+          const sx = (0.06 + scanPos * 0.88) * w;
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+
+          const aura = ctx.createLinearGradient(sx - 55, 0, sx + 45, 0);
+          aura.addColorStop(0, "rgba(34, 211, 238, 0)");
+          aura.addColorStop(0.55, "rgba(56, 189, 248, 0.28)");
+          aura.addColorStop(0.8, "rgba(236, 72, 153, 0.32)");
+          aura.addColorStop(1, "rgba(236, 72, 153, 0)");
+          ctx.fillStyle = aura;
+          ctx.fillRect(sx - 55, cy - h * 0.38, 100, h * 0.76);
+
+          if (Math.random() < 0.75) {
+            spawnParticle(sx, cy + (Math.random() - 0.5) * 38, 1.25, true);
+          }
+          ctx.restore();
+        }
+
+        // 4. Luminous Particles
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        drawParticles();
+        ctx.restore();
+      }
+
+      function springOut(t) {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return 1 - Math.pow(1 - t, 3) * Math.cos(t * Math.PI * 1.35);
+      }
+
+      function setCharMorphState(el, idx, progress, dissolveAlpha) {
+        if (progress <= 0.001) {
+          el.style.opacity = "0";
+          el.style.transform = "translateY(8px) scaleY(2.35) scaleX(0.75)";
+          el.style.filter = "blur(9px)";
+          return;
+        }
+
+        const clamped = Math.min(1, Math.max(0, progress));
+        const sp = springOut(clamped);
+
+        const scaleY = 2.35 - 1.35 * sp;
+        const scaleX = 0.75 + 0.25 * sp;
+        const dy = (1 - sp) * (idx % 2 === 0 ? -10 : 10);
+        const blur = Math.max(0, (1 - clamped) * 9);
+        const alpha = Math.min(1, clamped * 1.45) * dissolveAlpha;
+
+        el.style.opacity = alpha.toFixed(3);
+        el.style.transform = `translateY(${dy.toFixed(1)}px) scaleY(${scaleY.toFixed(3)}) scaleX(${scaleX.toFixed(3)})`;
+        el.style.filter = blur > 0.15 ? `blur(${blur.toFixed(1)}px)` : "none";
+
+        // Transient wave-to-text chromatic glow while morphing
+        if (clamped < 0.88) {
+          const glowStrength = (1 - clamped / 0.88);
+          const ratio = idx / Math.max(1, charEls.length - 1);
+          if (ratio < 0.36) {
+            el.style.color = "#a5f3fc";
+            el.style.textShadow = `0 0 ${Math.round(18 * glowStrength)}px rgba(34, 211, 238, ${0.9 * glowStrength})`;
+          } else if (ratio < 0.7) {
+            el.style.color = "#c4b5fd";
+            el.style.textShadow = `0 0 ${Math.round(18 * glowStrength)}px rgba(139, 92, 246, ${0.9 * glowStrength})`;
+          } else {
+            el.style.color = "#fbcfe8";
+            el.style.textShadow = `0 0 ${Math.round(18 * glowStrength)}px rgba(236, 72, 153, ${0.9 * glowStrength})`;
+          }
+        } else {
+          el.style.color = "#ffffff";
+          el.style.textShadow = "none";
+        }
+      }
+
+      function positionCaretAfterChar(charIdx, visible, blink) {
+        if (!caretEl || charMetrics.length === 0) return;
+        caretEl.setAttribute("data-visible", visible ? "true" : "false");
+        caretEl.setAttribute("data-blink", blink ? "true" : "false");
+        if (!visible) return;
+
+        const m = charMetrics[Math.max(0, Math.min(charMetrics.length - 1, charIdx))];
+        if (!m) return;
+        caretEl.style.height = `${Math.round(m.height * 0.88)}px`;
+        caretEl.style.transform = `translate3d(${Math.round(m.rightRel + 3)}px, ${Math.round(m.topRel + m.height * 0.07)}px, 0)`;
+      }
+
+      function updateCharsAndHUD(scanPos, phase, phaseProgress, elapsedMs) {
+        if (phase === "record") {
+          for (let i = 0; i < charEls.length; i++) {
+            setCharMorphState(charEls[i], i, 0, 1);
+          }
+          positionCaretAfterChar(0, false, false);
+          textLayer.setAttribute("data-glow", "false");
+
+          pill.setAttribute("data-state", "recording");
+          pillText.textContent = "⌥ Option turēts · Klausās balsi...";
+          const sec = (elapsedMs / 1000).toFixed(1);
+          timerEl.textContent = `00:0${sec}`;
+          timerEl.style.opacity = "1";
+
+          if (step1) step1.setAttribute("data-active", "blue");
+          if (step2) step2.setAttribute("data-active", "purple");
+          if (step3) step3.setAttribute("data-active", "none");
+          return;
+        }
+
+        if (phase === "morph") {
+          let lastIdx = 0;
+          for (let i = 0; i < charEls.length; i++) {
+            const cpos = charMetrics[i] ? charMetrics[i].normX : (i / charEls.length);
+            const local = (scanPos - (cpos - 0.04)) / 0.11;
+            const t = Math.max(0, Math.min(1, local));
+            setCharMorphState(charEls[i], i, t, 1);
+            if (t > 0.25) lastIdx = i;
+          }
+          positionCaretAfterChar(lastIdx, scanPos > 0.04, false);
+          textLayer.setAttribute("data-glow", "true");
+
+          pill.setAttribute("data-state", "processing");
+          pillText.textContent = "⚡ Atlaid taustiņu · Atšifrē (0.14s)...";
+          timerEl.textContent = "Metal GPU";
+
+          if (step1) step1.setAttribute("data-active", "none");
+          if (step2) step2.setAttribute("data-active", "purple");
+          if (step3) step3.setAttribute("data-active", "emerald");
+          return;
+        }
+
+        if (phase === "hold") {
+          for (let i = 0; i < charEls.length; i++) {
+            setCharMorphState(charEls[i], i, 1, 1);
+          }
+          positionCaretAfterChar(charEls.length - 1, true, true);
+          textLayer.setAttribute("data-glow", "true");
+
+          pill.setAttribute("data-state", "done");
+          pillText.textContent = "✓ Teksts ievietots kursorā";
+          timerEl.textContent = "100% lokāli";
+
+          if (step1) step1.setAttribute("data-active", "none");
+          if (step2) step2.setAttribute("data-active", "none");
+          if (step3) step3.setAttribute("data-active", "emerald");
+          return;
+        }
+
+        // dissolve phase
+        const fade = Math.max(0, 1 - phaseProgress * 1.25);
+        for (let i = 0; i < charEls.length; i++) {
+          setCharMorphState(charEls[i], i, 1, fade);
+        }
+        positionCaretAfterChar(charEls.length - 1, fade > 0.3, false);
+        textLayer.setAttribute("data-glow", "false");
+      }
+
+      let cycleStart = performance.now();
+
+      function restartCycle() {
+        cycleStart = performance.now();
+        particles.length = 0;
+        measureChars();
+      }
+
+      stage.addEventListener("click", restartCycle);
+      if (replayBtn) {
+        replayBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          restartCycle();
+        });
+      }
+
+      window.addEventListener("resize", resize);
+
+      buildTextLayer();
+      resize();
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(resize);
+      }
+
+      function tick(now) {
+        const elapsed = (now - cycleStart) % TOTAL;
+        let phase = "record";
+        let phaseProgress = 0;
+        let scanPos = 0;
+
+        if (elapsed < PHASE.RECORD) {
+          phase = "record";
+          phaseProgress = elapsed / PHASE.RECORD;
+        } else if (elapsed < PHASE.RECORD + PHASE.MORPH) {
+          phase = "morph";
+          phaseProgress = (elapsed - PHASE.RECORD) / PHASE.MORPH;
+          // Smooth cubic ease-in-out for the morph sweep
+          scanPos = phaseProgress < 0.5
+            ? 2 * phaseProgress * phaseProgress
+            : 1 - Math.pow(-2 * phaseProgress + 2, 2) / 2;
+        } else if (elapsed < PHASE.RECORD + PHASE.MORPH + PHASE.HOLD) {
+          phase = "hold";
+          phaseProgress = (elapsed - PHASE.RECORD - PHASE.MORPH) / PHASE.HOLD;
+          scanPos = 1;
+        } else {
+          phase = "dissolve";
+          phaseProgress = (elapsed - PHASE.RECORD - PHASE.MORPH - PHASE.HOLD) / PHASE.DISSOLVE;
+          scanPos = 1;
+        }
+
+        updateParticles();
+        drawScene(now, phase, phaseProgress, scanPos);
+        updateCharsAndHUD(scanPos, phase, phaseProgress, elapsed);
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
     })();
   </script>
 
