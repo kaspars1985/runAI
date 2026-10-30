@@ -259,7 +259,9 @@ struct SettingsView: View {
                         get: { state.selectedInputID ?? "" },
                         set: { state.setInputDevice($0) }
                     )) {
-                        if state.selectedInputID == nil || !state.inputDevices.contains(where: { $0.id == state.selectedInputID }) {
+                        if state.inputDevices.isEmpty {
+                            Text("Nav pievienots neviens mikrofons").tag("")
+                        } else if state.selectedInputID == nil || !state.inputDevices.contains(where: { $0.id == state.selectedInputID }) {
                             Text("Sistēmas noklusētais").tag("")
                         }
                         ForEach(state.inputDevices) { device in

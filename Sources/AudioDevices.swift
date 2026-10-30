@@ -42,10 +42,12 @@ enum AudioDevices {
             mElement: kAudioObjectPropertyElementMain)
         var defaultID = AudioDeviceID(0)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID) == noErr else {
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &defaultID) == noErr,
+              defaultID != kAudioObjectUnknown,
+              hasInputChannels(defaultID) else {
             return nil
         }
-        return deviceUID(defaultID) ?? String(defaultID)
+        return deviceUID(defaultID)
     }
 
     static func deviceID(forUID uid: String) -> AudioDeviceID? {

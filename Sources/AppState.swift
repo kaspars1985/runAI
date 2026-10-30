@@ -51,7 +51,10 @@ final class AppState: ObservableObject {
         if let lang = UserDefaults.standard.string(forKey: "language"), !lang.isEmpty {
             language = lang
         }
-        if let mid = UserDefaults.standard.string(forKey: "selectedInput") {
+        if let mid = UserDefaults.standard.string(forKey: "selectedInput"),
+           !mid.isEmpty,
+           !mid.contains("CADefaultDeviceAggregate"),
+           mid != "0" {
             selectedInputID = mid
         }
         if let m = UserDefaults.standard.string(forKey: "selectedModel") {
@@ -99,10 +102,11 @@ final class AppState: ObservableObject {
         refreshMicPermission()
         monitor.start()
 
-        // Atļauju stāvokļa atsvaidzināšana
+        // Atļauju un audio ierīču stāvokļa atsvaidzināšana
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.refreshAccessibility()
             self?.refreshMicPermission()
+            self?.refreshInputDevices()
         }
 
         // Pirmajā palaišanā pieprasām mikrofona atļauju, lai lietotne parādītos
@@ -367,18 +371,42 @@ final class AppState: ObservableObject {
     }
 
     func setInputDevice(_ uid: String) {
-        selectedInputID = uid
+        guard !uid.isEmpty else { return }
+        if selectedInputID != uid {
+            selectedInputID = uid
+        }
         UserDefaults.standard.set(uid, forKey: "selectedInput")
     }
 
     func refreshInputDevices() {
-        inputDevices = AudioDevices.listInputDevices()
+        let newDevices = AudioDevices.listInputDevices()
+        if inputDevices != newDevices {
+            inputDevices = newDevices
+        }
+
         let defaultUID = AudioDevices.defaultInputUID()
-        if selectedInputID == nil {
-            selectedInputID = defaultUID
-        } else if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
-            // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz noklusēto.
-            selectedInputID = defaultUID
+        let savedUID = UserDefaults.standard.string(forKey: "selectedInput")
+
+        let targetUID: String?
+        if let sel = selectedInputID, !sel.isEmpty, newDevices.contains(where: { $0.id == sel }) {
+            // Pašreiz izvēlētā ierīce joprojām ir pieslēgta
+            targetUID = sel
+        } else if let saved = savedUID, !saved.isEmpty, newDevices.contains(where: { $0.id == saved }) {
+            // Iepriekš saglabātā ierīce (piem., AirPods) tikko atkal pieslēdzās
+            targetUID = saved
+        } else if let def = defaultUID, newDevices.contains(where: { $0.id == def }) {
+            // Izmantojam sistēmas noklusēto ievades ierīci (piem., tikko ielikti AirPods)
+            targetUID = def
+        } else {
+            // Pirmā pieejamā ierīce vai nil, ja nav neviena mikrofona
+            targetUID = newDevices.first?.id
+        }
+
+        if selectedInputID != targetUID {
+            selectedInputID = targetUID
+            if let valid = targetUID, !valid.isEmpty {
+                UserDefaults.standard.set(valid, forKey: "selectedInput")
+            }
         }
     }
 
