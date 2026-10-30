@@ -5,14 +5,13 @@ import CoreGraphics
 /// Atbalsta: modifikatora taustiņu (turēšana), taustiņu kombinācijas un peles pogas.
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
-    var onRelease: ((TimeInterval) -> Void)?
+    var onRelease: (() -> Void)?
     /// Kad uzstādīts — monitors darbojas "tveršanas" režīmā un atgriež nospiesto taustiņu.
     var onCaptured: ((Hotkey?) -> Void)?
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private(set) var isDown = false
-    private var pressStartTime: Date?
     private var hotkey: Hotkey
     private var captureModifierKey: UInt16?
 
@@ -161,14 +160,12 @@ final class HotkeyMonitor {
         case .otherMouseDown:
             if !isDown {
                 isDown = true
-                pressStartTime = Date()
                 onPress?()
             }
         case .otherMouseUp:
             if isDown {
                 isDown = false
-                let duration = Date().timeIntervalSince(pressStartTime ?? Date())
-                onRelease?(duration)
+                onRelease?()
             }
         default:
             break
@@ -203,12 +200,10 @@ final class HotkeyMonitor {
             let hasFlag = event.flags.contains(flag)
             if hasFlag && !isDown {
                 isDown = true
-                pressStartTime = Date()
                 onPress?()
             } else if !hasFlag && isDown {
                 isDown = false
-                let duration = Date().timeIntervalSince(pressStartTime ?? Date())
-                onRelease?(duration)
+                onRelease?()
             }
             return false
         }
@@ -218,7 +213,6 @@ final class HotkeyMonitor {
             if keyCode == hotkey.keyCode && !autorepeat && hotkey.matches(keyCode: keyCode, flags: event.flags) {
                 if !isDown {
                     isDown = true
-                    pressStartTime = Date()
                     onPress?()
                 }
             }
@@ -226,8 +220,7 @@ final class HotkeyMonitor {
             if keyCode == hotkey.keyCode {
                 if isDown {
                     isDown = false
-                    let duration = Date().timeIntervalSince(pressStartTime ?? Date())
-                    onRelease?(duration)
+                    onRelease?()
                 }
             }
         default:

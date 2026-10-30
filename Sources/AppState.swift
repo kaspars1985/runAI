@@ -41,7 +41,6 @@ final class AppState: ObservableObject {
     private var hudHideWork: DispatchWorkItem?
     private var permissionTimer: Timer?
     private var didSetup = false
-    private var isToggleActive = false
 
     private init() {
         // Ielādē saglabātos iestatījumus
@@ -80,8 +79,8 @@ final class AppState: ObservableObject {
         Paths.ensureDirs()
         monitor = HotkeyMonitor(hotkey: hotkey)
 
-        monitor.onPress = { [weak self] in self?.handlePress() }
-        monitor.onRelease = { [weak self] duration in self?.handleRelease(duration: duration) }
+        monitor.onPress = { [weak self] in self?.startRecording() }
+        monitor.onRelease = { [weak self] in self?.stopRecordingAndTranscribe() }
         recorder.onLevel = { [weak self] level in self?.hud.updateLevel(level) }
 
         // Piemēro izvēlēto izskata tēmu
@@ -119,37 +118,10 @@ final class AppState: ObservableObject {
 
     // MARK: - Ierakstīšana
 
-    private func handlePress() {
-        guard !isCapturingHotkey else { return }
-        if status == .recording {
-            // Ja jau ieraksta (piem., toggle režīmā) — nākamais nospiediens pabeidz ierakstu
-            isToggleActive = false
-            stopRecordingAndTranscribe()
-            return
-        }
-        guard status != .transcribing else { return }
-        startRecording()
-    }
-
-    private func handleRelease(duration: TimeInterval) {
-        guard !isCapturingHotkey else { return }
-        guard status == .recording else { return }
-        if duration >= 0.35 {
-            // Push-to-Talk režīms: taustiņš tika turēts un atlaists
-            isToggleActive = false
-            stopRecordingAndTranscribe()
-        } else {
-            // Toggle režīms: īss nospiediens (< 0.35 s) — paliekam ierakstā
-            isToggleActive = true
-        }
-    }
-
     func toggleRecording() {
         if status == .recording {
-            isToggleActive = false
             stopRecordingAndTranscribe()
         } else if status != .transcribing {
-            isToggleActive = true
             startRecording()
         }
     }
@@ -204,7 +176,6 @@ final class AppState: ObservableObject {
     }
 
     private func finishTranscription(text: String?, error: String?) {
-        isToggleActive = false
         if let error = error {
             status = .error(error)
             showHUD(text: error)
