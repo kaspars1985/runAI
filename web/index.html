@@ -126,6 +126,110 @@
       50% { transform: translateY(-10px) rotate(180deg) scale(1.1); }
       100% { transform: translateY(0px) rotate(360deg) scale(0.8); }
     }
+
+    /* ===== Animated runAI hero icon ===== */
+    .hero-icon-wrap {
+      position: relative;
+      width: 11rem;   /* 176px */
+      height: 11rem;
+      margin: 0 auto 2.5rem;
+      cursor: pointer;
+    }
+
+    /* Ambient breathing backlight */
+    .hero-icon-backlight {
+      position: absolute;
+      inset: -18%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.55), transparent 55%),
+        radial-gradient(circle at 70% 70%, rgba(129, 140, 248, 0.5), transparent 55%),
+        radial-gradient(circle at 50% 90%, rgba(244, 114, 182, 0.4), transparent 60%);
+      filter: blur(28px);
+      opacity: 0.55;
+      animation: hero-breathe 5.5s ease-in-out infinite;
+      pointer-events: none;
+      transition: opacity 0.6s ease, filter 0.6s ease;
+    }
+    @keyframes hero-breathe {
+      0%, 100% { opacity: 0.45; transform: scale(0.94); }
+      50%      { opacity: 0.8;  transform: scale(1.06); }
+    }
+
+    .hero-icon-svg {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: block;
+      filter: drop-shadow(0 22px 40px rgba(0, 0, 0, 0.55));
+      transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.55s ease;
+      transform-origin: center;
+    }
+    .hero-icon-wrap:hover .hero-icon-svg {
+      transform: scale(1.06) rotate(-1.5deg);
+      filter: drop-shadow(0 26px 55px rgba(56, 189, 248, 0.35));
+    }
+    .hero-icon-wrap:hover .hero-icon-backlight {
+      opacity: 1;
+      filter: blur(34px);
+    }
+
+    /* Wave ribbons undulation */
+    .hero-wave {
+      transform-origin: center;
+      animation: hero-wave-float 4.2s ease-in-out infinite;
+    }
+    .hero-wave-2 { animation-duration: 5.1s; animation-delay: -0.8s; }
+    .hero-wave-3 { animation-duration: 4.7s; animation-delay: -1.6s; }
+    .hero-wave-4 { animation-duration: 5.6s; animation-delay: -2.3s; }
+    @keyframes hero-wave-float {
+      0%, 100% { transform: translateY(0) scaleY(1); }
+      50%      { transform: translateY(-3px) scaleY(1.08); }
+    }
+    .hero-icon-wrap:hover .hero-wave {
+      animation-duration: 1.6s;
+    }
+
+    /* Glowing nodes */
+    .hero-node {
+      transform-origin: center;
+      animation: hero-node-pulse 3.4s ease-in-out infinite;
+    }
+    .hero-node-2 { animation-delay: -1.1s; }
+    .hero-node-3 { animation-delay: -2.2s; }
+    @keyframes hero-node-pulse {
+      0%, 100% { opacity: 0.55; transform: scale(0.85); }
+      50%      { opacity: 1;    transform: scale(1.15); }
+    }
+    .hero-icon-wrap:hover .hero-node {
+      animation-duration: 1.2s;
+    }
+
+    /* Specular shimmer sweep */
+    .hero-sheen {
+      transform: translateX(-140%) skewX(-18deg);
+      animation: hero-sheen-sweep 6s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes hero-sheen-sweep {
+      0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+      8%   { opacity: 0.9; }
+      45%  { transform: translateX(140%) skewX(-18deg); opacity: 0; }
+      100% { transform: translateX(140%) skewX(-18deg); opacity: 0; }
+    }
+    .hero-icon-wrap:hover .hero-sheen {
+      animation-duration: 2.4s;
+    }
+
+    /* Inner rim highlight subtle rotation */
+    .hero-rim {
+      animation: hero-rim-shift 8s ease-in-out infinite;
+    }
+    @keyframes hero-rim-shift {
+      0%, 100% { opacity: 0.55; }
+      50%      { opacity: 0.9; }
+    }
   </style>
 </head>
 <body class="bg-surface-canvas text-zinc-100 antialiased selection:bg-blue-600 selection:text-white">
@@ -160,15 +264,147 @@
   <!-- Hero Section -->
   <main class="max-w-4xl mx-auto px-6 pt-20 pb-24 text-center">
     
-    <!-- Top pill -->
-    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-medium mb-8">
-      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-      100% lokāla un privāta balss diktēšana Mac datorā
-    </div>
+    <!-- App Icon Centerpiece (Animated SVG) -->
+    <div class="hero-icon-wrap" aria-label="runAI ikona">
+      <!-- Ambient breathing backlight -->
+      <div class="hero-icon-backlight"></div>
 
-    <!-- App Icon Centerpiece -->
-    <div class="relative w-24 h-24 mx-auto mb-8">
-      <img src="icon.png" alt="runAI Icon" class="w-24 h-24 rounded-2xl shadow-2xl relative z-10 glow-glow">
+      <svg class="hero-icon-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="runAI animated icon">
+        <defs>
+          <!-- Squircle clip path (macOS-style superellipse) -->
+          <clipPath id="squircleClip">
+            <path d="M100 4
+                     C 148 4, 196 52, 196 100
+                     C 196 148, 148 196, 100 196
+                     C 52 196, 4 148, 4 100
+                     C 4 52, 52 4, 100 4 Z" />
+          </clipPath>
+
+          <!-- Dark glassmorphic background -->
+          <linearGradient id="glassBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#1b1f2b"/>
+            <stop offset="45%" stop-color="#0f1219"/>
+            <stop offset="100%" stop-color="#05070b"/>
+          </linearGradient>
+
+          <!-- Metallic rim highlight -->
+          <linearGradient id="rimGradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="35%"  stop-color="#ffffff" stop-opacity="0.08"/>
+            <stop offset="65%"  stop-color="#ffffff" stop-opacity="0.02"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.35"/>
+          </linearGradient>
+
+          <!-- Inner bevel -->
+          <radialGradient id="innerBevel" cx="50%" cy="35%" r="75%">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.10"/>
+            <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.02"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+          </radialGradient>
+
+          <!-- Wave gradients -->
+          <linearGradient id="waveCyan" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
+            <stop offset="20%"  stop-color="#38bdf8"/>
+            <stop offset="80%"  stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="waveViolet" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#818cf8" stop-opacity="0"/>
+            <stop offset="25%"  stop-color="#818cf8"/>
+            <stop offset="75%"  stop-color="#a78bfa"/>
+            <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="waveMagenta" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#f472b6" stop-opacity="0"/>
+            <stop offset="30%"  stop-color="#f472b6"/>
+            <stop offset="70%"  stop-color="#ec4899"/>
+            <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="waveBlue" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#3b82f6" stop-opacity="0"/>
+            <stop offset="25%"  stop-color="#3b82f6"/>
+            <stop offset="75%"  stop-color="#38bdf8"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+          </linearGradient>
+
+          <!-- Glow filter for waves -->
+          <filter id="waveGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3.2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- Specular sheen gradient -->
+          <linearGradient id="sheenGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+            <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Base squircle -->
+        <g clip-path="url(#squircleClip)">
+          <rect x="0" y="0" width="200" height="200" fill="url(#glassBg)"/>
+
+          <!-- Inner bevel overlay -->
+          <rect x="0" y="0" width="200" height="200" fill="url(#innerBevel)"/>
+
+          <!-- Subtle ambient light orbs -->
+          <ellipse cx="55" cy="45" rx="90" ry="70" fill="#38bdf8" opacity="0.10"/>
+          <ellipse cx="150" cy="160" rx="80" ry="60" fill="#818cf8" opacity="0.10"/>
+
+          <!-- Acoustic soundwave ribbons -->
+          <g filter="url(#waveGlow)">
+            <!-- Wave 1: cyan -->
+            <path class="hero-wave hero-wave-1" d="M 20 100
+                     C 45 78, 70 122, 100 100
+                     C 130 78, 155 122, 180 100"
+                  fill="none" stroke="url(#waveCyan)" stroke-width="6" stroke-linecap="round"/>
+
+            <!-- Wave 2: violet -->
+            <path class="hero-wave hero-wave-2" d="M 20 100
+                     C 45 122, 70 78, 100 100
+                     C 130 122, 155 78, 180 100"
+                  fill="none" stroke="url(#waveViolet)" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+
+            <!-- Wave 3: magenta -->
+            <path class="hero-wave hero-wave-3" d="M 20 100
+                     C 45 88, 70 112, 100 100
+                     C 130 88, 155 112, 180 100"
+                  fill="none" stroke="url(#waveMagenta)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+
+            <!-- Wave 4: blue -->
+            <path class="hero-wave hero-wave-4" d="M 20 100
+                     C 45 112, 70 88, 100 100
+                     C 130 112, 155 88, 180 100"
+                  fill="none" stroke="url(#waveBlue)" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+          </g>
+
+          <!-- Glowing nodes -->
+          <g filter="url(#waveGlow)">
+            <circle class="hero-node hero-node-1" cx="100" cy="100" r="6" fill="#38bdf8"/>
+            <circle class="hero-node hero-node-2" cx="60"  cy="100" r="4" fill="#818cf8"/>
+            <circle class="hero-node hero-node-3" cx="140" cy="100" r="4" fill="#f472b6"/>
+          </g>
+
+          <!-- Specular shimmer sweep -->
+          <g clip-path="url(#squircleClip)">
+            <rect class="hero-sheen" x="-60" y="-40" width="60" height="280" fill="url(#sheenGradient)" opacity="0.7"/>
+          </g>
+        </g>
+
+        <!-- Metallic rim highlight (on top of clip) -->
+        <path class="hero-rim" d="M100 4
+                 C 148 4, 196 52, 196 100
+                 C 196 148, 148 196, 100 196
+                 C 52 196, 4 148, 4 100
+                 C 4 52, 52 4, 100 4 Z"
+              fill="none" stroke="url(#rimGradient)" stroke-width="1.5"/>
+      </svg>
     </div>
 
     <!-- Hero Title -->
