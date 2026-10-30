@@ -91,99 +91,176 @@ struct MenuBarIcon: View {
 
 struct MenuBarView: View {
     @EnvironmentObject var state: AppState
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var colors: ThemeColors {
+        ThemeColors(theme: state.appTheme, colorScheme: colorScheme)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Galvene ar lietotnes ikonu un statusu
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            // Galvene ar lietotnes ikonu, nosaukumu un statusu
+            HStack(spacing: 9) {
                 if let appIcon = AppIconImageHelper.loadIcon() {
                     Image(nsImage: appIcon)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
                 } else {
                     Image(systemName: "waveform")
-                        .font(.title2)
-                        .foregroundColor(.accentColor)
+                        .font(.system(size: 18))
+                        .foregroundColor(colors.textPrimary)
                 }
+
                 VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Text("runAI")
-                            .font(.headline)
-                            .fontWeight(.bold)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(colors.textPrimary)
+                        Text(state.updateChecker.currentVersion)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(colors.textSecondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(colors.keycapBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                    }
+                    HStack(spacing: 5) {
                         Circle()
                             .fill(statusColor)
-                            .frame(width: 7, height: 7)
-                    }
-                    Text(state.status.hudText)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.vertical, 2)
-
-            if state.updateChecker.updateAvailable {
-                Divider()
-                Button(action: { state.updateChecker.openReleasePage() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundColor(.accentColor)
-                        Text("Pieejams atjauninājums (v\(state.updateChecker.latestVersion ?? ""))")
-                            .font(.caption)
-                            .fontWeight(.medium)
+                            .frame(width: 6, height: 6)
+                        Text(state.status.hudText)
+                            .font(.system(size: 10.5))
+                            .foregroundColor(colors.textSecondary)
                     }
                 }
-                .buttonStyle(.plain)
+
+                Spacer(minLength: 4)
+
+                if state.updateChecker.updateAvailable {
+                    Button {
+                        state.updateChecker.openReleasePage()
+                    } label: {
+                        Text("v\(state.updateChecker.latestVersion ?? "")")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundColor(colors.badgeBlueText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(colors.badgeBlueBg)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(.bottom, 2)
 
-            Divider()
-
-            // Dati par modeli un taustiņu
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text("Modelis:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            // Kartīte: Pašreizējais modelis un taustiņš
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Modelis")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(colors.textMuted)
                     Spacer()
                     Text(state.selectedModelTitle)
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(colors.textPrimary)
+                        .lineLimit(1)
                 }
-                HStack {
-                    Text("Taustiņš:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+
+                Divider().opacity(0.4)
+
+                HStack(alignment: .center) {
+                    Text("Taustiņš")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(colors.textMuted)
                     Spacer()
                     Text(state.hotkey.label)
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(colors.textPrimary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(colors.keycapBg)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .stroke(colors.cardBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
             }
+            .padding(9)
+            .background(colors.cardBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(colors.cardBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            Divider()
-
-            Button("Iestatījumi…") { SettingsWindowController.shared.show() }
-            Button("Atvērt mapi ar modeļiem") { state.revealModelsFolder() }
-
-            Divider()
-
-            Button("Iziet") { NSApp.terminate(nil) }
+            // Darbību rindas
+            VStack(spacing: 2) {
+                MenuBarRowButton(title: "Iestatījumi…", icon: "gearshape", colors: colors) {
+                    SettingsWindowController.shared.show()
+                }
+                MenuBarRowButton(title: "Atvērt modeļu mapi", icon: "folder", colors: colors) {
+                    state.revealModelsFolder()
+                }
+                Divider().opacity(0.4).padding(.vertical, 2)
+                MenuBarRowButton(title: "Iziet", icon: "power", colors: colors) {
+                    NSApp.terminate(nil)
+                }
+            }
         }
-        .padding(10)
-        .frame(minWidth: 230, alignment: .leading)
+        .padding(12)
+        .frame(width: 250)
+        .background(colors.canvasBg)
+        .preferredColorScheme(state.appTheme.colorScheme)
     }
 
     private var statusColor: Color {
         switch state.status {
         case .recording: return .red
         case .transcribing: return .orange
-        case .ready: return .green
+        case .ready: return colors.statusGreen
         case .copied: return .blue
         case .needsModel: return .yellow
         case .loading: return .purple
-        case .error: return .red
+        case .error: return colors.statusRed
+        }
+    }
+}
+
+// MARK: - Izvēlnes rindas poga
+
+private struct MenuBarRowButton: View {
+    let title: String
+    let icon: String
+    let colors: ThemeColors
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundColor(colors.textSecondary)
+                    .frame(width: 14)
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(colors.textPrimary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(isHovered ? colors.keycapBg : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
         }
     }
 }
@@ -222,5 +299,6 @@ struct RunAIApp: App {
         } label: {
             MenuBarIcon().environmentObject(state)
         }
+        .menuBarExtraStyle(.window)
     }
 }

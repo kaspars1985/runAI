@@ -147,7 +147,7 @@ struct SettingsView: View {
                     Text("runAI")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundColor(colors.textPrimary)
-                    Text("1.0")
+                    Text(updates.currentVersion)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(colors.textSecondary)
                         .padding(.horizontal, 5)
