@@ -1548,63 +1548,90 @@
           compressAtX = () => 1;
           flareAtX = () => 0;
         } else {
-          // dissolve back to gentle idle wave
-          const emerge = phaseProgress;
+          // dissolve back to gentle idle wave only after text has faded out
+          const emerge = Math.max(0, (phaseProgress - 0.45) / 0.55);
           ampAtX = (nx) => 0.18 * emerge * Math.sin(nx * Math.PI);
           compressAtX = () => 1 - emerge;
           flareAtX = () => 0;
         }
 
-        // 1. Harmonic glowing ribbons
-        const ribbonConfigs = [
-          { c1: "rgba(34, 211, 238, 0.85)", c2: "rgba(34, 211, 238, 0)", freq: 2.3, speed: 0.0042, offset: 0.0, width: 2.4 },
-          { c1: "rgba(99, 102, 241, 0.80)", c2: "rgba(99, 102, 241, 0)", freq: 3.1, speed: -0.0036, offset: 2.1, width: 2.0 },
-          { c1: "rgba(236, 72, 153, 0.80)", c2: "rgba(236, 72, 153, 0)", freq: 3.9, speed: 0.0048, offset: 4.2, width: 1.8 }
-        ];
+        // 1. Harmonic glowing ribbons (only visible where wave has not yet morphed into text)
+        if (phase !== "hold") {
+          const ribbonAlpha = phase === "dissolve"
+            ? Math.max(0, (phaseProgress - 0.45) / 0.55)
+            : 1;
 
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
+          if (ribbonAlpha > 0.01) {
+            const ribbonConfigs = [
+              { c1: "rgba(34, 211, 238, 0.85)", c2: "rgba(34, 211, 238, 0)", freq: 2.3, speed: 0.0042, offset: 0.0, width: 2.4 },
+              { c1: "rgba(99, 102, 241, 0.80)", c2: "rgba(99, 102, 241, 0)", freq: 3.1, speed: -0.0036, offset: 2.1, width: 2.0 },
+              { c1: "rgba(236, 72, 153, 0.80)", c2: "rgba(236, 72, 153, 0)", freq: 3.9, speed: 0.0048, offset: 4.2, width: 1.8 }
+            ];
 
-        for (let r = 0; r < ribbonConfigs.length; r++) {
-          const cfg = ribbonConfigs[r];
-          ctx.beginPath();
-          const steps = 130;
-          for (let i = 0; i <= steps; i++) {
-            const nx = i / steps;
-            const x = nx * w;
-            const amp = ampAtX(nx);
-            const comp = compressAtX(nx);
-            const flare = flareAtX(nx);
+            ctx.save();
+            ctx.globalAlpha = ribbonAlpha;
+            ctx.globalCompositeOperation = "lighter";
 
-            const s1 = Math.sin(nx * Math.PI * cfg.freq + now * cfg.speed + cfg.offset);
-            const s2 = Math.cos(nx * Math.PI * (cfg.freq * 1.8) - now * cfg.speed * 1.4 + cfg.offset);
-            const wave = s1 * 0.68 + s2 * 0.32;
+            for (let r = 0; r < ribbonConfigs.length; r++) {
+              const cfg = ribbonConfigs[r];
+              ctx.beginPath();
+              const steps = 130;
+              let started = false;
+              for (let i = 0; i <= steps; i++) {
+                const nx = i / steps;
+                // Skip drawing ribbon behind already-morphed text so it never strikes through letters
+                if (phase === "morph" && nx < scanPos - 0.03) continue;
 
-            const maxRibbonAmp = (34 + r * 8) * (0.2 + amp * 1.35);
-            let y = cy + wave * maxRibbonAmp * (1 - comp);
+                const x = nx * w;
+                const amp = ampAtX(nx);
+                const comp = compressAtX(nx);
+                const flare = flareAtX(nx);
 
-            if (flare > 0) {
-              y += Math.sin(nx * 45 + now * 0.025) * flare * 9 * (1 - comp * 0.5);
+                const s1 = Math.sin(nx * Math.PI * cfg.freq + now * cfg.speed + cfg.offset);
+                const s2 = Math.cos(nx * Math.PI * (cfg.freq * 1.8) - now * cfg.speed * 1.4 + cfg.offset);
+                const wave = s1 * 0.68 + s2 * 0.32;
+
+                const maxRibbonAmp = (34 + r * 8) * (0.2 + amp * 1.35);
+                let y = cy + wave * maxRibbonAmp * (1 - comp);
+
+                if (flare > 0) {
+                  y += Math.sin(nx * 45 + now * 0.025) * flare * 9 * (1 - comp * 0.5);
+                }
+
+                if (!started) {
+                  ctx.moveTo(x, y);
+                  started = true;
+                } else {
+                  ctx.lineTo(x, y);
+                }
+              }
+
+              const grad = ctx.createLinearGradient(0, 0, w, 0);
+              if (phase === "morph") {
+                const cut = Math.max(0, Math.min(0.92, scanPos - 0.02));
+                const fadeIn = Math.min(0.96, cut + 0.06);
+                grad.addColorStop(0, cfg.c2);
+                grad.addColorStop(cut, cfg.c2);
+                grad.addColorStop(fadeIn, cfg.c1);
+                grad.addColorStop(0.92, cfg.c1);
+                grad.addColorStop(1, cfg.c2);
+              } else {
+                grad.addColorStop(0, cfg.c2);
+                grad.addColorStop(0.12, cfg.c1);
+                grad.addColorStop(0.88, cfg.c1);
+                grad.addColorStop(1, cfg.c2);
+              }
+
+              ctx.strokeStyle = grad;
+              ctx.lineWidth = cfg.width;
+              ctx.shadowColor = cfg.c1;
+              ctx.shadowBlur = 14;
+              ctx.stroke();
             }
-
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+            ctx.shadowBlur = 0;
+            ctx.restore();
           }
-
-          const grad = ctx.createLinearGradient(0, 0, w, 0);
-          grad.addColorStop(0, cfg.c2);
-          grad.addColorStop(0.12, cfg.c1);
-          grad.addColorStop(0.88, cfg.c1);
-          grad.addColorStop(1, cfg.c2);
-
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = cfg.width;
-          ctx.shadowColor = cfg.c1;
-          ctx.shadowBlur = 14;
-          ctx.stroke();
         }
-        ctx.shadowBlur = 0;
-        ctx.restore();
 
         // 2. Vertical spectral frequency bars
         ctx.save();
