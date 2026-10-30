@@ -127,33 +127,33 @@
       100% { transform: translateY(0px) rotate(360deg) scale(0.8); }
     }
 
-    /* ===== Animated runAI hero icon ===== */
+    /* ===== Animated runAI hero icon (1:1 faithful SVG) ===== */
     .hero-icon-wrap {
       position: relative;
-      width: 11rem;   /* 176px */
-      height: 11rem;
+      width: 11.5rem;   /* 184px */
+      height: 11.5rem;
       margin: 0 auto 2.5rem;
       cursor: pointer;
     }
 
-    /* Ambient breathing backlight */
+    /* Ambient breathing backlight matching cyan-violet-magenta wave */
     .hero-icon-backlight {
       position: absolute;
-      inset: -18%;
-      border-radius: 50%;
+      inset: -14%;
+      border-radius: 28%;
       background:
-        radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.55), transparent 55%),
-        radial-gradient(circle at 70% 70%, rgba(129, 140, 248, 0.5), transparent 55%),
-        radial-gradient(circle at 50% 90%, rgba(244, 114, 182, 0.4), transparent 60%);
+        radial-gradient(circle at 22% 50%, rgba(34, 211, 238, 0.55), transparent 55%),
+        radial-gradient(circle at 50% 35%, rgba(96, 165, 250, 0.50), transparent 58%),
+        radial-gradient(circle at 78% 55%, rgba(236, 72, 153, 0.55), transparent 55%);
       filter: blur(28px);
-      opacity: 0.55;
-      animation: hero-breathe 5.5s ease-in-out infinite;
+      opacity: 0.6;
+      animation: hero-breathe 5s ease-in-out infinite;
       pointer-events: none;
-      transition: opacity 0.6s ease, filter 0.6s ease;
+      transition: opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease;
     }
     @keyframes hero-breathe {
-      0%, 100% { opacity: 0.45; transform: scale(0.94); }
-      50%      { opacity: 0.8;  transform: scale(1.06); }
+      0%, 100% { opacity: 0.45; transform: scale(0.95); }
+      50%      { opacity: 0.82; transform: scale(1.06); }
     }
 
     .hero-icon-svg {
@@ -162,73 +162,103 @@
       width: 100%;
       height: 100%;
       display: block;
-      filter: drop-shadow(0 22px 40px rgba(0, 0, 0, 0.55));
-      transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.55s ease;
+      filter: drop-shadow(0 20px 38px rgba(0, 0, 0, 0.65));
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s ease;
       transform-origin: center;
     }
     .hero-icon-wrap:hover .hero-icon-svg {
-      transform: scale(1.06) rotate(-1.5deg);
-      filter: drop-shadow(0 26px 55px rgba(56, 189, 248, 0.35));
+      transform: scale(1.05) translateY(-3px);
+      filter: drop-shadow(0 26px 48px rgba(56, 189, 248, 0.32));
     }
     .hero-icon-wrap:hover .hero-icon-backlight {
-      opacity: 1;
+      opacity: 0.95;
       filter: blur(34px);
+      transform: scale(1.1);
     }
 
-    /* Wave ribbons undulation */
-    .hero-wave {
-      transform-origin: center;
-      animation: hero-wave-float 4.2s ease-in-out infinite;
+    /* 3D Acoustic wave layers anchored at (100, 101) so left/right tips stay locked */
+    .wave-layer-back,
+    .wave-layer-mid,
+    .wave-layer-main,
+    .wave-layer-chrome {
+      transform-origin: 100px 101px;
+      will-change: transform;
     }
-    .hero-wave-2 { animation-duration: 5.1s; animation-delay: -0.8s; }
-    .hero-wave-3 { animation-duration: 4.7s; animation-delay: -1.6s; }
-    .hero-wave-4 { animation-duration: 5.6s; animation-delay: -2.3s; }
-    @keyframes hero-wave-float {
-      0%, 100% { transform: translateY(0) scaleY(1); }
-      50%      { transform: translateY(-3px) scaleY(1.08); }
+    .wave-layer-back {
+      animation: wave-undulate-back 4.6s ease-in-out infinite;
     }
-    .hero-icon-wrap:hover .hero-wave {
-      animation-duration: 1.6s;
+    .wave-layer-mid {
+      animation: wave-undulate-mid 3.8s ease-in-out infinite;
     }
-
-    /* Glowing nodes */
-    .hero-node {
-      transform-origin: center;
-      animation: hero-node-pulse 3.4s ease-in-out infinite;
+    .wave-layer-main {
+      animation: wave-undulate-main 3.2s ease-in-out infinite;
     }
-    .hero-node-2 { animation-delay: -1.1s; }
-    .hero-node-3 { animation-delay: -2.2s; }
-    @keyframes hero-node-pulse {
-      0%, 100% { opacity: 0.55; transform: scale(0.85); }
-      50%      { opacity: 1;    transform: scale(1.15); }
-    }
-    .hero-icon-wrap:hover .hero-node {
-      animation-duration: 1.2s;
+    .wave-layer-chrome {
+      animation: wave-undulate-chrome 3.2s ease-in-out infinite;
     }
 
-    /* Specular shimmer sweep */
+    @keyframes wave-undulate-back {
+      0%, 100% { transform: scaleY(0.90); }
+      50%      { transform: scaleY(1.12); }
+    }
+    @keyframes wave-undulate-mid {
+      0%, 100% { transform: scaleY(1.08); }
+      50%      { transform: scaleY(0.86); }
+    }
+    @keyframes wave-undulate-main {
+      0%, 100% { transform: scaleY(0.92); }
+      35%      { transform: scaleY(1.09); }
+      70%      { transform: scaleY(0.96); }
+    }
+    @keyframes wave-undulate-chrome {
+      0%, 100% { transform: scaleY(0.94); }
+      35%      { transform: scaleY(1.07); }
+      70%      { transform: scaleY(0.97); }
+    }
+
+    .hero-icon-wrap:hover .wave-layer-back   { animation-duration: 2.1s; }
+    .hero-icon-wrap:hover .wave-layer-mid    { animation-duration: 1.7s; }
+    .hero-icon-wrap:hover .wave-layer-main   { animation-duration: 1.4s; }
+    .hero-icon-wrap:hover .wave-layer-chrome { animation-duration: 1.4s; }
+
+    /* Traveling light pulse along the chrome rails & glass edges */
+    .chrome-glint {
+      stroke-dasharray: 45 220;
+      animation: glint-flow 3.6s linear infinite;
+    }
+    .chrome-glint-2 {
+      stroke-dasharray: 40 220;
+      animation: glint-flow 3.6s linear infinite;
+      animation-delay: -1.8s;
+    }
+    @keyframes glint-flow {
+      0%   { stroke-dashoffset: 265; opacity: 0.2; }
+      20%  { opacity: 1; }
+      80%  { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 0.2; }
+    }
+
+    /* Refractive center glow pulse */
+    .wave-core-glow {
+      transform-origin: 100px 101px;
+      animation: core-shimmer 2.8s ease-in-out infinite alternate;
+    }
+    @keyframes core-shimmer {
+      0%   { opacity: 0.65; transform: scaleY(0.9) scaleX(0.98); }
+      100% { opacity: 1;    transform: scaleY(1.15) scaleX(1.02); }
+    }
+
+    /* Specular glass sheen sweep across the squircle */
     .hero-sheen {
-      transform: translateX(-140%) skewX(-18deg);
-      animation: hero-sheen-sweep 6s ease-in-out infinite;
-      transform-origin: center;
+      transform: translateX(-160%) skewX(-22deg);
+      animation: hero-sheen-sweep 6.5s ease-in-out infinite;
+      pointer-events: none;
     }
     @keyframes hero-sheen-sweep {
-      0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
-      8%   { opacity: 0.9; }
-      45%  { transform: translateX(140%) skewX(-18deg); opacity: 0; }
-      100% { transform: translateX(140%) skewX(-18deg); opacity: 0; }
-    }
-    .hero-icon-wrap:hover .hero-sheen {
-      animation-duration: 2.4s;
-    }
-
-    /* Inner rim highlight subtle rotation */
-    .hero-rim {
-      animation: hero-rim-shift 8s ease-in-out infinite;
-    }
-    @keyframes hero-rim-shift {
-      0%, 100% { opacity: 0.55; }
-      50%      { opacity: 0.9; }
+      0%   { transform: translateX(-160%) skewX(-22deg); opacity: 0; }
+      10%  { opacity: 0.75; }
+      40%  { transform: translateX(180%) skewX(-22deg); opacity: 0; }
+      100% { transform: translateX(180%) skewX(-22deg); opacity: 0; }
     }
   </style>
 </head>
@@ -264,146 +294,360 @@
   <!-- Hero Section -->
   <main class="max-w-4xl mx-auto px-6 pt-20 pb-24 text-center">
     
-    <!-- App Icon Centerpiece (Animated SVG) -->
+    <!-- App Icon Centerpiece (1:1 Faithful Animated SVG of runAI Icon) -->
     <div class="hero-icon-wrap" aria-label="runAI ikona">
       <!-- Ambient breathing backlight -->
       <div class="hero-icon-backlight"></div>
 
-      <svg class="hero-icon-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="runAI animated icon">
+      <svg class="hero-icon-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="runAI animēta ikona">
         <defs>
-          <!-- Squircle clip path (macOS-style superellipse) -->
-          <clipPath id="squircleClip">
-            <path d="M100 4
-                     C 148 4, 196 52, 196 100
-                     C 196 148, 148 196, 100 196
-                     C 52 196, 4 148, 4 100
-                     C 4 52, 52 4, 100 4 Z" />
+          <!-- Inner dark slate screen clip (matches icon.png inner bezel cavity) -->
+          <clipPath id="innerScreenClip">
+            <rect x="27.5" y="27.5" width="145" height="145" rx="29" ry="29" />
           </clipPath>
 
-          <!-- Dark glassmorphic background -->
-          <linearGradient id="glassBg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stop-color="#1b1f2b"/>
-            <stop offset="45%" stop-color="#0f1219"/>
-            <stop offset="100%" stop-color="#05070b"/>
+          <!-- Outer squircle clip for sheen -->
+          <clipPath id="outerSquircleClip">
+            <rect x="18" y="18" width="164" height="164" rx="37" ry="37" />
+          </clipPath>
+
+          <!-- 3D Brushed Silver / Chrome Bezel Gradient -->
+          <linearGradient id="chromeFrameGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ffffff"/>
+            <stop offset="18%"  stop-color="#e2e8f0"/>
+            <stop offset="42%"  stop-color="#94a3b8"/>
+            <stop offset="68%"  stop-color="#475569"/>
+            <stop offset="85%"  stop-color="#cbd5e1"/>
+            <stop offset="100%" stop-color="#64748b"/>
           </linearGradient>
 
-          <!-- Metallic rim highlight -->
-          <linearGradient id="rimGradient" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
-            <stop offset="35%"  stop-color="#ffffff" stop-opacity="0.08"/>
-            <stop offset="65%"  stop-color="#ffffff" stop-opacity="0.02"/>
-            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.35"/>
+          <!-- Outer Dark Gunmetal Casing Gradient -->
+          <linearGradient id="outerCasingGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#333b48"/>
+            <stop offset="50%"  stop-color="#1b2028"/>
+            <stop offset="100%" stop-color="#0d1015"/>
           </linearGradient>
 
-          <!-- Inner bevel -->
-          <radialGradient id="innerBevel" cx="50%" cy="35%" r="75%">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.10"/>
-            <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.02"/>
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
-          </radialGradient>
-
-          <!-- Wave gradients -->
-          <linearGradient id="waveCyan" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
-            <stop offset="20%"  stop-color="#38bdf8"/>
-            <stop offset="80%"  stop-color="#3b82f6"/>
-            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="waveViolet" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#818cf8" stop-opacity="0"/>
-            <stop offset="25%"  stop-color="#818cf8"/>
-            <stop offset="75%"  stop-color="#a78bfa"/>
-            <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="waveMagenta" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#f472b6" stop-opacity="0"/>
-            <stop offset="30%"  stop-color="#f472b6"/>
-            <stop offset="70%"  stop-color="#ec4899"/>
-            <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="waveBlue" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#3b82f6" stop-opacity="0"/>
-            <stop offset="25%"  stop-color="#3b82f6"/>
-            <stop offset="75%"  stop-color="#38bdf8"/>
-            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+          <!-- Inner Dark Slate-Navy Plate Gradient -->
+          <linearGradient id="innerPlateGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#3b4654"/>
+            <stop offset="28%"  stop-color="#222834"/>
+            <stop offset="68%"  stop-color="#12151e"/>
+            <stop offset="100%" stop-color="#0b0d13"/>
           </linearGradient>
 
-          <!-- Glow filter for waves -->
-          <filter id="waveGlow" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3.2" result="blur"/>
+          <!-- Left Cyan Glass Fin Gradient -->
+          <linearGradient id="cyanGlassFill" x1="0" y1="0" x2="0.8" y2="1">
+            <stop offset="0%"   stop-color="#a5f3fc" stop-opacity="0.92"/>
+            <stop offset="35%"  stop-color="#22d3ee" stop-opacity="0.78"/>
+            <stop offset="75%"  stop-color="#0284c7" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0.25"/>
+          </linearGradient>
+
+          <!-- Left Lower Sub-Lobe Gradient -->
+          <linearGradient id="cyanLowerFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0.65"/>
+            <stop offset="60%"  stop-color="#2563eb" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#93c5fd" stop-opacity="0.75"/>
+          </linearGradient>
+
+          <!-- Central Tall Peak Glass Gradient -->
+          <linearGradient id="centerPeakFill" x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0%"   stop-color="#67e8f9" stop-opacity="0.95"/>
+            <stop offset="30%"  stop-color="#38bdf8" stop-opacity="0.82"/>
+            <stop offset="65%"  stop-color="#6366f1" stop-opacity="0.70"/>
+            <stop offset="100%" stop-color="#a855f7" stop-opacity="0.40"/>
+          </linearGradient>
+
+          <!-- Central Deep Trough Glass Gradient -->
+          <linearGradient id="centerTroughFill" x1="0.3" y1="0" x2="0.7" y2="1">
+            <stop offset="0%"   stop-color="#818cf8" stop-opacity="0.55"/>
+            <stop offset="50%"  stop-color="#6366f1" stop-opacity="0.75"/>
+            <stop offset="85%"  stop-color="#38bdf8" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.95"/>
+          </linearGradient>
+
+          <!-- Right-Center Violet-Purple Arch Gradient -->
+          <linearGradient id="violetArchFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#c084fc" stop-opacity="0.88"/>
+            <stop offset="50%"  stop-color="#8b5cf6" stop-opacity="0.68"/>
+            <stop offset="100%" stop-color="#ec4899" stop-opacity="0.50"/>
+          </linearGradient>
+
+          <!-- Right Neon Magenta Glass Fin Gradient -->
+          <linearGradient id="magentaGlassFill" x1="0.2" y1="0" x2="0.9" y2="1">
+            <stop offset="0%"   stop-color="#e879f9" stop-opacity="0.65"/>
+            <stop offset="45%"  stop-color="#f472b6" stop-opacity="0.85"/>
+            <stop offset="80%"  stop-color="#ec4899" stop-opacity="0.92"/>
+            <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0.95"/>
+          </linearGradient>
+
+          <!-- Right Upper Rose-Violet Fin Gradient -->
+          <linearGradient id="roseUpperFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#f0abfc" stop-opacity="0.75"/>
+            <stop offset="55%"  stop-color="#a855f7" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#ec4899" stop-opacity="0.65"/>
+          </linearGradient>
+
+          <!-- Horizontal Refracted Core Glow -->
+          <linearGradient id="coreAxisGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#22d3ee" stop-opacity="0.9"/>
+            <stop offset="28%"  stop-color="#e0f2fe" stop-opacity="1"/>
+            <stop offset="52%"  stop-color="#93c5fd" stop-opacity="0.95"/>
+            <stop offset="76%"  stop-color="#f5d0fe" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.9"/>
+          </linearGradient>
+
+          <!-- 3D Metallic Chrome Ribbon Outer Stroke -->
+          <linearGradient id="chromeRailOuter" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#cbd5e1"/>
+            <stop offset="22%"  stop-color="#ffffff"/>
+            <stop offset="45%"  stop-color="#94a3b8"/>
+            <stop offset="65%"  stop-color="#f8fafc"/>
+            <stop offset="85%"  stop-color="#e2e8f0"/>
+            <stop offset="100%" stop-color="#94a3b8"/>
+          </linearGradient>
+
+          <!-- Soft Glow Filter (userSpaceOnUse prevents bounding-box clipping stripes) -->
+          <filter id="glassGlow" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
+            <feGaussianBlur stdDeviation="2.2" result="blur"/>
             <feMerge>
               <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
 
-          <!-- Specular sheen gradient -->
+          <!-- Intense Core Bloom Filter (userSpaceOnUse prevents horizontal stripe artifact) -->
+          <filter id="coreBloom" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
+            <feGaussianBlur stdDeviation="6.5" result="blur1"/>
+            <feGaussianBlur stdDeviation="2.5" result="blur2"/>
+            <feMerge>
+              <feMergeNode in="blur1"/>
+              <feMergeNode in="blur2"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- Specular Sheen Gradient -->
           <linearGradient id="sheenGradient" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
-            <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.55"/>
-            <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.28"/>
+            <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.28"/>
             <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
           </linearGradient>
         </defs>
 
-        <!-- Base squircle -->
-        <g clip-path="url(#squircleClip)">
-          <rect x="0" y="0" width="200" height="200" fill="url(#glassBg)"/>
+        <!-- 1. Outer Dark Metallic Squircle Casing -->
+        <rect x="18" y="18" width="164" height="164" rx="37" ry="37"
+              fill="url(#outerCasingGrad)" stroke="#475569" stroke-width="0.8" />
 
-          <!-- Inner bevel overlay -->
-          <rect x="0" y="0" width="200" height="200" fill="url(#innerBevel)"/>
+        <!-- 2. Thick 3D Brushed Silver / Chrome Bezel Ring -->
+        <rect x="20.5" y="20.5" width="159" height="159" rx="35" ry="35"
+              fill="url(#chromeFrameGrad)" stroke="#ffffff" stroke-width="0.7" stroke-opacity="0.8" />
 
-          <!-- Subtle ambient light orbs -->
-          <ellipse cx="55" cy="45" rx="90" ry="70" fill="#38bdf8" opacity="0.10"/>
-          <ellipse cx="150" cy="160" rx="80" ry="60" fill="#818cf8" opacity="0.10"/>
+        <!-- 3. Recessed Dark Inner Groove -->
+        <rect x="26" y="26" width="148" height="148" rx="30.5" ry="30.5"
+              fill="#090b10" stroke="#1e293b" stroke-width="0.8" />
 
-          <!-- Acoustic soundwave ribbons -->
-          <g filter="url(#waveGlow)">
-            <!-- Wave 1: cyan -->
-            <path class="hero-wave hero-wave-1" d="M 20 100
-                     C 45 78, 70 122, 100 100
-                     C 130 78, 155 122, 180 100"
-                  fill="none" stroke="url(#waveCyan)" stroke-width="6" stroke-linecap="round"/>
+        <!-- 4. Inner Dark Slate-Navy Screen -->
+        <g clip-path="url(#innerScreenClip)">
+          <rect x="27.5" y="27.5" width="145" height="145" rx="29" ry="29" fill="url(#innerPlateGrad)" />
 
-            <!-- Wave 2: violet -->
-            <path class="hero-wave hero-wave-2" d="M 20 100
-                     C 45 122, 70 78, 100 100
-                     C 130 122, 155 78, 180 100"
-                  fill="none" stroke="url(#waveViolet)" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+          <!-- Ambient backlight bloom inside the cavity -->
+          <ellipse cx="64"  cy="101" rx="34" ry="26" fill="#06b6d4" opacity="0.25" filter="url(#coreBloom)" />
+          <ellipse cx="100" cy="101" rx="28" ry="50" fill="#3b82f6" opacity="0.26" filter="url(#coreBloom)" />
+          <ellipse cx="135" cy="106" rx="34" ry="26" fill="#ec4899" opacity="0.25" filter="url(#coreBloom)" />
 
-            <!-- Wave 3: magenta -->
-            <path class="hero-wave hero-wave-3" d="M 20 100
-                     C 45 88, 70 112, 100 100
-                     C 130 88, 155 112, 180 100"
-                  fill="none" stroke="url(#waveMagenta)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+          <!-- ===== LAYER 1: Back Translucent Full-Span Glass Ribbons ===== -->
+          <g class="wave-layer-back">
+            <!-- Back Ribbon A: Lower-left cyan belly -> Left-center violet arch -> Lower-right purple belly -->
+            <path d="M 27.5 101
+                     C 40 101, 50 125.5, 64 125.5
+                     C 76 125.5, 81 77, 89 77
+                     C 98 77, 105 137, 115 137
+                     C 125 137, 129 80, 136 80
+                     C 146 80, 156 101, 172.5 101
+                     C 156 101, 146 92, 136 92
+                     C 127 92, 123 118, 115 118
+                     C 106 118, 97 92, 89 92
+                     C 80 92, 74 112, 64 112
+                     C 50 112, 40 101, 27.5 101 Z"
+                  fill="url(#violetArchFill)" opacity="0.72" stroke="#c4b5fd" stroke-width="1.1" stroke-opacity="0.8" />
 
-            <!-- Wave 4: blue -->
-            <path class="hero-wave hero-wave-4" d="M 20 100
-                     C 45 112, 70 88, 100 100
-                     C 130 112, 155 88, 180 100"
-                  fill="none" stroke="url(#waveBlue)" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+            <!-- Back Lower-Left Translucent Cyan Sub-Fin -->
+            <path d="M 27.5 101
+                     C 40 101, 50 125.5, 64 125.5
+                     C 74 125.5, 80 110, 86 101
+                     C 76 104, 68 108, 56 106
+                     C 44 104, 36 101, 27.5 101 Z"
+                  fill="url(#cyanLowerFill)" stroke="#7dd3fc" stroke-width="1.1" stroke-opacity="0.75" />
+
+            <!-- Back Upper-Right Rose-Magenta Sub-Fin -->
+            <path d="M 114 101
+                     C 121 90, 128 80, 135.5 80
+                     C 146 80, 156 101, 172.5 101
+                     C 156 101, 146 96, 135.5 95
+                     C 127 94, 120 98, 114 101 Z"
+                  fill="url(#roseUpperFill)" stroke="#f5d0fe" stroke-width="1.1" stroke-opacity="0.85" />
           </g>
 
-          <!-- Glowing nodes -->
-          <g filter="url(#waveGlow)">
-            <circle class="hero-node hero-node-1" cx="100" cy="100" r="6" fill="#38bdf8"/>
-            <circle class="hero-node hero-node-2" cx="60"  cy="100" r="4" fill="#818cf8"/>
-            <circle class="hero-node hero-node-3" cx="140" cy="100" r="4" fill="#f472b6"/>
+          <!-- ===== LAYER 2: Mid Full-Span Cyan & Neon Magenta Glass Fins ===== -->
+          <g class="wave-layer-mid" filter="url(#glassGlow)">
+            <!-- Left Electric Cyan Glass Fin flowing seamlessly into center -->
+            <path d="M 27.5 101
+                     C 42 101, 52 71, 64 71
+                     C 74 71, 79 112, 88 116
+                     C 95 119, 102 106, 110 101
+                     C 100 101, 92 106, 84 102
+                     C 75 97, 70 86, 63 86
+                     C 52 86, 42 101, 27.5 101 Z"
+                  fill="url(#cyanGlassFill)" stroke="#a5f3fc" stroke-width="1.4" />
+            <!-- Secondary translucent cyan belly fold -->
+            <path d="M 27.5 101
+                     C 42 101, 52 71, 64 71
+                     C 73 71, 77 96, 84 104
+                     C 72 104, 54 101, 27.5 101 Z"
+                  fill="url(#cyanGlassFill)" opacity="0.65" />
+
+            <!-- Right Neon Magenta Glass Fin flowing seamlessly from center to right wall -->
+            <path d="M 104 101
+                     C 114 101, 124 132, 135 132
+                     C 146 132, 156 101, 172.5 101
+                     C 156 101, 145 116, 135 116
+                     C 125 116, 116 101, 104 101 Z"
+                  fill="url(#magentaGlassFill)" stroke="#fbcfe8" stroke-width="1.5" />
+            <!-- Full-body magenta translucent veil -->
+            <path d="M 110 99
+                     C 119 105, 126 132, 135 132
+                     C 146 132, 156 101, 172.5 101
+                     C 152 101, 132 102, 110 99 Z"
+                  fill="url(#magentaGlassFill)" opacity="0.6" />
           </g>
 
-          <!-- Specular shimmer sweep -->
-          <g clip-path="url(#squircleClip)">
-            <rect class="hero-sheen" x="-60" y="-40" width="60" height="280" fill="url(#sheenGradient)" opacity="0.7"/>
+          <!-- ===== LAYER 3: Central Tall Cyan-Sapphire Peak & Deep Trough (Continuous S-Ribbons) ===== -->
+          <g class="wave-layer-main" filter="url(#glassGlow)">
+            <!-- Deep Central Trough Ribbon (flows smoothly from left lobe into deep nadir vx=97, vy=159 and out) -->
+            <path d="M 27.5 101
+                     C 50 101, 68 96, 79 106
+                     C 86 113, 91 159, 97 159
+                     C 103 159, 108 116, 116 101
+                     C 126 84, 142 101, 172.5 101
+                     C 144 101, 126 94, 113 105
+                     C 105 112, 101 144, 97 144
+                     C 93 144, 88 112, 78 104
+                     C 66 95, 48 101, 27.5 101 Z"
+                  fill="url(#centerTroughFill)" stroke="#7dd3fc" stroke-width="1.4" />
+            <!-- Translucent inner glass fin fill for deep trough -->
+            <path d="M 78 104
+                     C 86 114, 91 159, 97 159
+                     C 103 159, 108 114, 115 101
+                     C 104 104, 90 106, 78 104 Z"
+                  fill="url(#centerTroughFill)" opacity="0.75" />
+
+            <!-- Tall Central Peak Ribbon (flows from left trough up to apex vx=100, vy=44.5 and down into right lobe) -->
+            <path d="M 27.5 101
+                     C 52 101, 68 114, 78 108
+                     C 87 102, 93 44.5, 100 44.5
+                     C 107 44.5, 112 94, 121 103
+                     C 132 114, 148 101, 172.5 101
+                     C 148 101, 132 106, 118 98
+                     C 109 92, 104 58, 100 58
+                     C 95 58, 89 96, 78 104
+                     C 66 112, 50 101, 27.5 101 Z"
+                  fill="url(#centerPeakFill)" stroke="#a5f3fc" stroke-width="1.5" />
+            <!-- Translucent inner glass fin fill for tall peak -->
+            <path d="M 78 106
+                     C 87 96, 93 44.5, 100 44.5
+                     C 107 44.5, 112 90, 119 101
+                     C 106 103, 91 106, 78 106 Z"
+                  fill="url(#centerPeakFill)" opacity="0.78" />
           </g>
+
+          <!-- ===== LAYER 4: Soft Refracted Horizontal Light Core ===== -->
+          <g class="wave-core-glow" filter="url(#coreBloom)">
+            <path d="M 30 101
+                     C 52 101, 66 95, 80 104
+                     C 94 112, 106 90, 120 99
+                     C 134 108, 150 101, 170 101"
+                  fill="none" stroke="url(#coreAxisGrad)" stroke-width="2.6" stroke-linecap="round" opacity="0.85" />
+          </g>
+
+          <!-- ===== LAYER 5: Signature 3D Brushed Chrome S-Curve Ribbons (Full-Span, Zero Stubs) ===== -->
+          <g class="wave-layer-chrome">
+            <!-- Chrome Ribbon 2 (Back-to-Front Interwoven Rail):
+                 Starts at left wall (27.5,101) -> crests left (64,84) -> plunges to deep trough (90,137) -> crests right-center (119,73) -> right wall (172.5,101) -->
+            <path d="M 27.5 102.2
+                     C 44 102.2, 54 85.5, 64 85.5
+                     C 75 85.5, 82 138.5, 90.5 138.5
+                     C 99 138.5, 109 74.5, 119 74.5
+                     C 128 74.5, 136 96, 148 100.5
+                     C 156 102, 164 102.2, 172.5 102.2"
+                  fill="none" stroke="#090d16" stroke-width="4.6" stroke-linecap="round" opacity="0.6" />
+            <path d="M 27.5 101
+                     C 44 101, 54 84, 64 84
+                     C 75 84, 82 137, 90.5 137
+                     C 99 137, 109 73, 119 73
+                     C 128 73, 136 94.5, 148 99
+                     C 156 100.8, 164 101, 172.5 101"
+                  fill="none" stroke="url(#chromeRailOuter)" stroke-width="3.6" stroke-linecap="round" />
+            <path d="M 27.5 101.2
+                     C 44 101.2, 54 84.3, 64 84.3
+                     C 75 84.3, 82 137.3, 90.5 137.3
+                     C 99 137.3, 109 73.3, 119 73.3
+                     C 128 73.3, 136 94.8, 148 99.3
+                     C 156 101, 164 101.2, 172.5 101.2"
+                  fill="none" stroke="#334155" stroke-width="1.3" stroke-linecap="round" />
+            <path class="chrome-glint-2"
+                  d="M 27.5 100.6
+                     C 44 100.6, 54 83.6, 64 83.6
+                     C 75 83.6, 82 136.6, 90.5 136.6
+                     C 99 136.6, 109 72.6, 119 72.6
+                     C 128 72.6, 136 94.1, 148 98.6
+                     C 156 100.4, 164 100.6, 172.5 100.6"
+                  fill="none" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round" />
+
+            <!-- Chrome Ribbon 1 (Primary Front Hero Rail):
+                 Starts at left wall (27.5,101) -> dips to trough (78,118) -> shoots up to high crest (109,55) -> sweeps through (134,114) -> right wall (172.5,101) -->
+            <path d="M 27.5 102.5
+                     C 45 102.5, 55 104, 64 111
+                     C 70 116, 74 119.5, 78.5 119.5
+                     C 88 119.5, 98 56.5, 109 56.5
+                     C 119 56.5, 125 114, 135 114
+                     C 145 114, 154 102.5, 172.5 102.5"
+                  fill="none" stroke="#090d16" stroke-width="5.2" stroke-linecap="round" opacity="0.68" />
+            <path d="M 27.5 101
+                     C 45 101, 55 102.5, 64 109.5
+                     C 70 114.5, 74 118, 78.5 118
+                     C 88 118, 98 55, 109 55
+                     C 119 55, 125 112.5, 135 112.5
+                     C 145 112.5, 154 101, 172.5 101"
+                  fill="none" stroke="url(#chromeRailOuter)" stroke-width="4.2" stroke-linecap="round" />
+            <path d="M 27.5 101.3
+                     C 45 101.3, 55 102.8, 64 109.8
+                     C 70 114.8, 74 118.3, 78.5 118.3
+                     C 88 118.3, 98 55.3, 109 55.3
+                     C 119 55.3, 125 112.8, 135 112.8
+                     C 145 112.8, 154 101.3, 172.5 101.3"
+                  fill="none" stroke="#334155" stroke-width="1.5" stroke-linecap="round" />
+            <path class="chrome-glint"
+                  d="M 27.5 100.5
+                     C 45 100.5, 55 102, 64 109
+                     C 70 114, 74 117.5, 78.5 117.5
+                     C 88 117.5, 98 54.5, 109 54.5
+                     C 119 54.5, 125 112, 135 112
+                     C 145 112, 154 100.5, 172.5 100.5"
+                  fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
+          </g>
+
+          <!-- Inner screen border neon reflection -->
+          <rect x="28" y="28" width="144" height="144" rx="28.5" ry="28.5"
+                fill="none" stroke="url(#coreAxisGrad)" stroke-width="1.2" opacity="0.45" />
         </g>
 
-        <!-- Metallic rim highlight (on top of clip) -->
-        <path class="hero-rim" d="M100 4
-                 C 148 4, 196 52, 196 100
-                 C 196 148, 148 196, 100 196
-                 C 52 196, 4 148, 4 100
-                 C 4 52, 52 4, 100 4 Z"
-              fill="none" stroke="url(#rimGradient)" stroke-width="1.5"/>
+        <!-- Specular shimmer sweep across the entire squircle -->
+        <g clip-path="url(#outerSquircleClip)">
+          <rect class="hero-sheen" x="-70" y="-40" width="65" height="280" fill="url(#sheenGradient)" />
+        </g>
       </svg>
     </div>
 
