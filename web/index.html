@@ -130,10 +130,16 @@
     /* ===== Animated runAI hero icon (1:1 faithful SVG) ===== */
     .hero-icon-wrap {
       position: relative;
-      width: 11.5rem;   /* 184px */
-      height: 11.5rem;
+      width: 14.5rem;   /* 232px */
+      height: 14.5rem;
       margin: 0 auto 2.5rem;
       cursor: pointer;
+    }
+    @media (min-width: 640px) {
+      .hero-icon-wrap {
+        width: 16.5rem; /* 264px */
+        height: 16.5rem;
+      }
     }
 
     /* Ambient breathing backlight matching cyan-violet-magenta wave */
