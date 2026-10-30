@@ -155,6 +155,55 @@ struct MenuBarView: View {
             }
             .padding(.bottom, 2)
 
+            // Galvenā ieraksta poga
+            Button {
+                state.toggleRecording()
+            } label: {
+                HStack(spacing: 8) {
+                    if state.status == .recording {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                        Text("Apturēt un atšifrēt")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(colors.statusRed)
+                        Spacer()
+                        Text("Ieraksta…")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(colors.textSecondary)
+                    } else if state.status == .transcribing {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text("Atšifrē…")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(colors.textPrimary)
+                        Spacer()
+                    } else {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                        Text("Sākt ierakstu")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(colors.textPrimary)
+                        Spacer()
+                        Text(state.hotkey.label)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(colors.textMuted)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(state.status == .recording ? colors.statusRed.opacity(0.12) : colors.cardBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(state.status == .recording ? colors.statusRed.opacity(0.3) : colors.cardBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(state.status == .transcribing || state.status == .loading)
+
             // Kartīte: Pašreizējais modelis un taustiņš
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {

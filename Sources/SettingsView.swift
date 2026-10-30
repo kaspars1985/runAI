@@ -242,7 +242,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("Turiet taustiņu un runājiet. Atlaižot — teksts tiks ievietots tur, kur atrodas kursors.")
+                    Text("Turiet taustiņu runāšanas laikā (Push-to-Talk) vai nospiediet vienreiz, lai sāktu, un otrreiz, lai pabeigtu. Darbojas gan kreisais, gan labais ⌥ Option.")
                         .font(.system(size: 10.5))
                         .foregroundColor(colors.textMuted)
                         .fixedSize(horizontal: false, vertical: true)

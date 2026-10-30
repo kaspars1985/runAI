@@ -9,6 +9,7 @@ final class AudioRecorder {
     private let targetFormat: AVAudioFormat
     private let queue = DispatchQueue(label: "lv.runai.audio")
     private let sampleRate: Double = 16000
+    private var isTapped = false
 
     private(set) var samples: [Float] = []
     /// Mikrofona līmenis (0…1), tiek izsaukts galvenajā pavedienā.
@@ -24,21 +25,35 @@ final class AudioRecorder {
     }
 
     func start() throws {
+        guard !engine.isRunning else { return }
         samples.removeAll(keepingCapacity: true)
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
-        converter = AVAudioConverter(from: inputFormat, to: targetFormat)
+        if inputFormat.sampleRate > 0 && inputFormat.channelCount > 0 {
+            converter = AVAudioConverter(from: inputFormat, to: targetFormat)
+        }
 
+        if isTapped {
+            input.removeTap(onBus: 0)
+            isTapped = false
+        }
         input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             self?.process(buffer)
         }
+        isTapped = true
         engine.prepare()
         try engine.start()
     }
 
     func stop() {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        guard engine.isRunning || isTapped else { return }
+        if isTapped {
+            engine.inputNode.removeTap(onBus: 0)
+            isTapped = false
+        }
+        if engine.isRunning {
+            engine.stop()
+        }
     }
 
     /// Atgriež un notīra uzkrātos paraugus (pavediendroši).
@@ -65,7 +80,10 @@ final class AudioRecorder {
     }
 
     private func process(_ buffer: AVAudioPCMBuffer) {
-        guard let converter = converter else { return }
+        if converter == nil || converter?.inputFormat != buffer.format {
+            converter = AVAudioConverter(from: buffer.format, to: targetFormat)
+        }
+        guard let converter = converter, buffer.format.sampleRate > 0 else { return }
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
         guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: outCapacity) else { return }

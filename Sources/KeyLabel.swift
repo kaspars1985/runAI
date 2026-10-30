@@ -19,14 +19,10 @@ enum KeyLabel {
         case 0x7C: return "→"
         case 0x7D: return "↓"
         case 0x7E: return "↑"
-        case 0x3A: return "Kreisais ⌥ Option"
-        case 0x3D: return "Labais ⌥ Option"
-        case 0x36: return "Labais ⌘ Command"
-        case 0x37: return "Kreisais ⌘ Command"
-        case 0x38: return "Kreisais ⇧ Shift"
-        case 0x3C: return "Labais ⇧ Shift"
-        case 0x3B: return "Kreisais ⌃ Control"
-        case 0x3E: return "Labais ⌃ Control"
+        case 0x3A, 0x3D: return "⌥ Option"
+        case 0x36, 0x37: return "⌘ Command"
+        case 0x38, 0x3C: return "⇧ Shift"
+        case 0x3B, 0x3E: return "⌃ Control"
         case 0x3F: return "Fn"
         default: break
         }

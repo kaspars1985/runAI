@@ -5,13 +5,14 @@ import CoreGraphics
 /// Atbalsta: modifikatora taustiņu (turēšana), taustiņu kombinācijas un peles pogas.
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
-    var onRelease: (() -> Void)?
+    var onRelease: ((TimeInterval) -> Void)?
     /// Kad uzstādīts — monitors darbojas "tveršanas" režīmā un atgriež nospiesto taustiņu.
     var onCaptured: ((Hotkey?) -> Void)?
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private(set) var isDown = false
+    private var pressStartTime: Date?
     private var hotkey: Hotkey
     private var captureModifierKey: UInt16?
 
@@ -160,12 +161,14 @@ final class HotkeyMonitor {
         case .otherMouseDown:
             if !isDown {
                 isDown = true
+                pressStartTime = Date()
                 onPress?()
             }
         case .otherMouseUp:
             if isDown {
                 isDown = false
-                onRelease?()
+                let duration = Date().timeIntervalSince(pressStartTime ?? Date())
+                onRelease?(duration)
             }
         default:
             break
@@ -178,15 +181,34 @@ final class HotkeyMonitor {
         let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
 
         if hotkey.isModifierOnly {
-            guard type == .flagsChanged, keyCode == hotkey.keyCode else { return false }
+            guard type == .flagsChanged else { return false }
+
+            // Atbalstām gan kreiso, gan labo modifikatoru taustiņu (piem., kreisais vai labais ⌥ Option)
+            let matchesKey: Bool
+            switch hotkey.keyCode {
+            case 0x3A, 0x3D: // Option (Kreisais: 0x3A, Labais: 0x3D)
+                matchesKey = (keyCode == 0x3A || keyCode == 0x3D)
+            case 0x37, 0x36: // Command (Kreisais: 0x37, Labais: 0x36)
+                matchesKey = (keyCode == 0x37 || keyCode == 0x36)
+            case 0x38, 0x3C: // Shift (Kreisais: 0x38, Labais: 0x3C)
+                matchesKey = (keyCode == 0x38 || keyCode == 0x3C)
+            case 0x3B, 0x3E: // Control (Kreisais: 0x3B, Labais: 0x3E)
+                matchesKey = (keyCode == 0x3B || keyCode == 0x3E)
+            default:
+                matchesKey = (keyCode == hotkey.keyCode)
+            }
+            guard matchesKey else { return false }
+
             guard let flag = hotkey.modifierFlag else { return false }
             let hasFlag = event.flags.contains(flag)
             if hasFlag && !isDown {
                 isDown = true
+                pressStartTime = Date()
                 onPress?()
             } else if !hasFlag && isDown {
                 isDown = false
-                onRelease?()
+                let duration = Date().timeIntervalSince(pressStartTime ?? Date())
+                onRelease?(duration)
             }
             return false
         }
@@ -196,6 +218,7 @@ final class HotkeyMonitor {
             if keyCode == hotkey.keyCode && !autorepeat && hotkey.matches(keyCode: keyCode, flags: event.flags) {
                 if !isDown {
                     isDown = true
+                    pressStartTime = Date()
                     onPress?()
                 }
             }
@@ -203,7 +226,8 @@ final class HotkeyMonitor {
             if keyCode == hotkey.keyCode {
                 if isDown {
                     isDown = false
-                    onRelease?()
+                    let duration = Date().timeIntervalSince(pressStartTime ?? Date())
+                    onRelease?(duration)
                 }
             }
         default:
