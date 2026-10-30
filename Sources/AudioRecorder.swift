@@ -2,6 +2,20 @@ import Foundation
 import AVFoundation
 import AudioToolbox
 
+enum AudioRecorderError: LocalizedError {
+    case noInputDevice
+    case invalidFormat
+
+    var errorDescription: String? {
+        switch self {
+        case .noInputDevice:
+            return "Nav pievienots neviens mikrofons"
+        case .invalidFormat:
+            return "Mikrofona audio formāts nav pieejams"
+        }
+    }
+}
+
 /// Tver mikrofonu, pārveido uz 16 kHz / mono / float32 un uzkrāj paraugus.
 final class AudioRecorder {
     private var engine: AVAudioEngine?
@@ -30,6 +44,10 @@ final class AudioRecorder {
 
     func start() throws {
         guard !isRunning else { return }
+        if AudioDevices.listInputDevices().isEmpty {
+            AppLogger.warn("AudioRecorder.start: sistēmā nav atrasta neviena audio ievades ierīce")
+            throw AudioRecorderError.noInputDevice
+        }
         queue.sync {
             samples.removeAll(keepingCapacity: true)
         }
@@ -92,6 +110,10 @@ final class AudioRecorder {
         let hwFormat = input.inputFormat(forBus: 0)
         let outFormat = input.outputFormat(forBus: 0)
         AppLogger.info("AudioRecorder.startEngine: hwFormat sampleRate=\(hwFormat.sampleRate) channels=\(hwFormat.channelCount); outFormat sampleRate=\(outFormat.sampleRate) channels=\(outFormat.channelCount)")
+
+        guard outFormat.sampleRate > 0, outFormat.channelCount > 0 else {
+            throw AudioRecorderError.invalidFormat
+        }
 
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.process(buffer)

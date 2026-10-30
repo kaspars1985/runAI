@@ -156,9 +156,14 @@ final class AppState: ObservableObject {
             try recorder.start()
             status = .recording
             showHUD(text: status.hudText, showLevel: true)
+        } catch let error as AudioRecorderError where error == .noInputDevice {
+            AppLogger.error("startRecording neizdevās: nav pievienots neviens mikrofons")
+            status = .error("Nav pievienots neviens mikrofons")
+            showHUD(text: status.hudText)
+            scheduleHUDHide(after: 2.5)
         } catch {
             AppLogger.error("startRecording neizdevās: \(error.localizedDescription)")
-            status = .error("Mikrofons nav pieejams. Pārbaudiet atļauju iestatījumos.")
+            status = .error("Mikrofons nav pieejams. Pārbaudiet savienojumu vai iestatījumus.")
             showHUD(text: status.hudText)
             scheduleHUDHide(after: 2.5)
         }
