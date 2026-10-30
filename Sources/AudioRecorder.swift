@@ -26,23 +26,28 @@ final class AudioRecorder {
 
     func start() throws {
         guard !engine.isRunning else { return }
-        samples.removeAll(keepingCapacity: true)
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        if inputFormat.sampleRate > 0 && inputFormat.channelCount > 0 {
-            converter = AVAudioConverter(from: inputFormat, to: targetFormat)
+        queue.sync {
+            samples.removeAll(keepingCapacity: true)
         }
+        converter = nil
+        let input = engine.inputNode
 
         if isTapped {
             input.removeTap(onBus: 0)
             isTapped = false
         }
-        input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+        let hwFormat = input.outputFormat(forBus: 0)
+        AppLogger.info("AudioRecorder.start: hwFormat sampleRate=\(hwFormat.sampleRate) channels=\(hwFormat.channelCount)")
+
+        // format: nil ļauj AVAudioInputNode izmantot faktisko aparatūras formātu,
+        // novēršot Objective-C NSException pie Bluetooth/AirPods frekvenču maiņas.
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.process(buffer)
         }
         isTapped = true
         engine.prepare()
         try engine.start()
+        AppLogger.info("AudioRecorder.start: AVAudioEngine veiksmīgi palaists")
     }
 
     func stop() {
@@ -54,6 +59,7 @@ final class AudioRecorder {
         if engine.isRunning {
             engine.stop()
         }
+        AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
     /// Atgriež un notīra uzkrātos paraugus (pavediendroši).

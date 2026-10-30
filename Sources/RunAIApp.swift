@@ -13,6 +13,9 @@ final class SettingsWindowController {
         if isFirstTime {
             let view = SettingsView(state: AppState.shared)
             let hosting = NSHostingController(rootView: view)
+            // Neļaujam NSHostingController automātiski mainīt loga izmēru —
+            // pretējā gadījumā rodas animēta izmēra maiņas cilpa ar setContentSize.
+            hosting.sizingOptions = []
             self.hosting = hosting
 
             let w = NSWindow(contentViewController: hosting)
@@ -24,13 +27,11 @@ final class SettingsWindowController {
 
         applyAppearance()
 
-        // Dinamiski pielāgo loga augstumu saturam (bez ritināšanas)
-        if let hosting = hosting, let w = window {
+        // Pirmajā atvēršanas reizē pielāgojam loga augstumu saturam.
+        if isFirstTime, let hosting = hosting, let w = window {
             let fitting = hosting.sizeThatFits(in: NSSize(width: 760, height: CGFloat.greatestFiniteMagnitude))
             w.setContentSize(NSSize(width: 760, height: max(fitting.height, 570)))
-            if isFirstTime {
-                w.center()
-            }
+            w.center()
         }
 
         NSApp.activate(ignoringOtherApps: true)
@@ -56,11 +57,6 @@ final class SettingsWindowController {
             w.backgroundColor = NSColor(red: 0.984, green: 0.984, blue: 0.980, alpha: 1.0)
         case .dark:
             w.backgroundColor = NSColor(red: 0.078, green: 0.078, blue: 0.086, alpha: 1.0)
-        }
-
-        if let hosting = hosting {
-            let fitting = hosting.sizeThatFits(in: NSSize(width: 760, height: CGFloat.greatestFiniteMagnitude))
-            w.setContentSize(NSSize(width: 760, height: max(fitting.height, 570)))
         }
 
         w.contentView?.needsDisplay = true
@@ -155,55 +151,6 @@ struct MenuBarView: View {
             }
             .padding(.bottom, 2)
 
-            // Galvenā ieraksta poga
-            Button {
-                state.toggleRecording()
-            } label: {
-                HStack(spacing: 8) {
-                    if state.status == .recording {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                        Text("Apturēt un atšifrēt")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(colors.statusRed)
-                        Spacer()
-                        Text("Ieraksta…")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(colors.textSecondary)
-                    } else if state.status == .transcribing {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 11))
-                            .foregroundColor(.orange)
-                        Text("Atšifrē…")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(colors.textPrimary)
-                        Spacer()
-                    } else {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                        Text("Sākt ierakstu")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(colors.textPrimary)
-                        Spacer()
-                        Text(state.hotkey.label)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(colors.textMuted)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(state.status == .recording ? colors.statusRed.opacity(0.12) : colors.cardBg)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(state.status == .recording ? colors.statusRed.opacity(0.3) : colors.cardBorder, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(state.status == .transcribing || state.status == .loading)
-
             // Kartīte: Pašreizējais modelis un taustiņš
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
@@ -253,16 +200,18 @@ struct MenuBarView: View {
                 MenuBarRowButton(title: "Atvērt modeļu mapi", icon: "folder", colors: colors) {
                     state.revealModelsFolder()
                 }
+                MenuBarRowButton(title: "Atvērt žurnālu (Log)", icon: "doc.text", colors: colors) {
+                    state.revealLogFile()
+                }
                 Divider().opacity(0.4).padding(.vertical, 2)
                 MenuBarRowButton(title: "Iziet", icon: "power", colors: colors) {
-                    NSApp.terminate(nil)
+                    state.quitApp()
                 }
             }
         }
         .padding(12)
         .frame(width: 250)
         .background(colors.canvasBg)
-        .preferredColorScheme(state.appTheme.colorScheme)
     }
 
     private var statusColor: Color {
@@ -332,6 +281,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         SettingsWindowController.shared.show()
         return true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AppLogger.info("applicationWillTerminate")
+        AppState.shared.quitApp()
     }
 }
 

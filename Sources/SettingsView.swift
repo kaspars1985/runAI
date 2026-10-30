@@ -110,7 +110,6 @@ struct SettingsView: View {
         .padding(18)
         .frame(width: 760, alignment: .topLeading)
         .background(colors.canvasBg)
-        .preferredColorScheme(state.appTheme.colorScheme)
         .onAppear {
             state.refreshModels()
             state.refreshInputDevices()

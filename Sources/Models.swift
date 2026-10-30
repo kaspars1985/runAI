@@ -260,7 +260,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
 // MARK: - Ikonas palīgs
 
 enum AppIconImageHelper {
-    static func loadIcon() -> NSImage? {
+    /// Ikonu ielādē TIKAI VIENU reizi. Iepriekš `NSImage(contentsOf:)` tika izsaukts
+    /// katrā SwiftUI body novērtēšanā, radot jaunu NSImage instanci katrā kadrā un
+    /// izraisot bezgalīgu NSHostingView izkārtojuma atgriezenisko saiti.
+    private static let cached: NSImage? = {
         if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "png"),
            let img = NSImage(contentsOf: url) {
             return img
@@ -269,5 +272,9 @@ enum AppIconImageHelper {
             return img
         }
         return NSApp.applicationIconImage
+    }()
+
+    static func loadIcon() -> NSImage? {
+        return cached
     }
 }

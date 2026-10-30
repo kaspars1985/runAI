@@ -55,6 +55,9 @@ final class HotkeyMonitor {
             if let source = source {
                 CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
             }
+            AppLogger.info("HotkeyMonitor: event tap started")
+        } else {
+            AppLogger.warn("HotkeyMonitor: event tap failed to start (tap == nil) — pārbaudīt Accessibility atļauju")
         }
     }
 
@@ -86,6 +89,7 @@ final class HotkeyMonitor {
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            AppLogger.warn("HotkeyMonitor: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "userInput")) — re-enabled")
             return false
         }
 
@@ -160,12 +164,14 @@ final class HotkeyMonitor {
         case .otherMouseDown:
             if !isDown {
                 isDown = true
-                onPress?()
+                AppLogger.info("HotkeyMonitor: hotkey press (mouse button \(button))")
+                DispatchQueue.main.async { [weak self] in self?.onPress?() }
             }
         case .otherMouseUp:
             if isDown {
                 isDown = false
-                onRelease?()
+                AppLogger.info("HotkeyMonitor: hotkey release (mouse button \(button))")
+                DispatchQueue.main.async { [weak self] in self?.onRelease?() }
             }
         default:
             break
@@ -200,10 +206,12 @@ final class HotkeyMonitor {
             let hasFlag = event.flags.contains(flag)
             if hasFlag && !isDown {
                 isDown = true
-                onPress?()
+                AppLogger.info("HotkeyMonitor: hotkey press (modifier keyCode=\(keyCode))")
+                DispatchQueue.main.async { [weak self] in self?.onPress?() }
             } else if !hasFlag && isDown {
                 isDown = false
-                onRelease?()
+                AppLogger.info("HotkeyMonitor: hotkey release (modifier keyCode=\(keyCode))")
+                DispatchQueue.main.async { [weak self] in self?.onRelease?() }
             }
             return false
         }
@@ -213,14 +221,16 @@ final class HotkeyMonitor {
             if keyCode == hotkey.keyCode && !autorepeat && hotkey.matches(keyCode: keyCode, flags: event.flags) {
                 if !isDown {
                     isDown = true
-                    onPress?()
+                    AppLogger.info("HotkeyMonitor: hotkey press (keyCode=\(keyCode))")
+                    DispatchQueue.main.async { [weak self] in self?.onPress?() }
                 }
             }
         case .keyUp:
             if keyCode == hotkey.keyCode {
                 if isDown {
                     isDown = false
-                    onRelease?()
+                    AppLogger.info("HotkeyMonitor: hotkey release (keyCode=\(keyCode))")
+                    DispatchQueue.main.async { [weak self] in self?.onRelease?() }
                 }
             }
         default:
