@@ -2,18 +2,46 @@ import Cocoa
 import ApplicationServices
 
 /// Ievieto tekstu aktīvajā lietotnē: vispirms mēģina caur Accessibility API,
-/// pēc tam — starpliktuve + ⌘V (ar starpliktuves atjaunošanu).
+/// pēc tam — starpliktuve + ⌘V.
+/// Teksts VIENMĒR paliek starpliktuvē (clipboard), lai lietotājs jebkurā brīdī varētu nospiest ⌘V.
 final class TextInserter {
 
-    /// Atgriež, kuru ceļu izmantoja (patiesība — Accessibility; nepatiesība — starpliktuve).
+    enum InsertOutcome {
+        case insertedDirectly   // Ievietots caur Accessibility API tieši kursorā
+        case pastedViaShortcut  // Ielīmēts caur ⌘V
+        case copiedOnly         // Nav teksta lauka, atstāts starpliktuvē
+    }
+
+    /// Ievieto tekstu aktīvajā lietotnē un vienmēr saglabā to starpliktuvē.
     @discardableResult
-    func insert(_ text: String) -> Bool {
-        guard !text.isEmpty else { return true }
+    func insert(_ text: String) -> InsertOutcome {
+        guard !text.isEmpty else { return .copiedOnly }
+
+        // 1. Vienmēr iekopējam starpliktuvē, lai teksts nekad nepazustu
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+
+        // 2. Mēģinām ievietot tieši kursorā caur Accessibility
         if insertViaAccessibility(text) {
-            return true
+            return .insertedDirectly
         }
-        insertViaPasteboard(text)
-        return false
+
+        // 3. Pārbaudām, vai aktīvajā logā ir fokusēts elements pirms ⌘V sūtīšanas
+        if hasFocusedUIElement() {
+            sendPasteShortcut()
+            return .pastedViaShortcut
+        } else {
+            AppLogger.info("TextInserter: nav fokusēta teksta lauka, teksts paliek starpliktuvē (gatavs ⌘V)")
+            return .copiedOnly
+        }
+    }
+
+    private func hasFocusedUIElement() -> Bool {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return false }
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        var focusedValue: CFTypeRef?
+        return AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success && focusedValue != nil
     }
 
     // MARK: - Accessibility (tieša ievietošana)
@@ -60,38 +88,7 @@ final class TextInserter {
         return result == .success
     }
 
-    // MARK: - Starpliktuve + ⌘V
-
-    private func insertViaPasteboard(_ text: String) {
-        let pb = NSPasteboard.general
-        let saved = snapshotPasteboard()
-
-        pb.clearContents()
-        pb.setString(text, forType: .string)
-
-        sendPasteShortcut()
-
-        // Atjauno iepriekšējo starpliktuves saturu pēc nelielas pauzes.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            let pb2 = NSPasteboard.general
-            pb2.clearContents()
-            pb2.writeObjects(saved)
-        }
-    }
-
-    private func snapshotPasteboard() -> [NSPasteboardItem] {
-        let pb = NSPasteboard.general
-        return (pb.pasteboardItems ?? []).map { item in
-            let copy = NSPasteboardItem()
-            for type in item.types {
-                if let data = item.data(forType: type) {
-                    copy.setData(data, forType: type)
-                }
-            }
-            return copy
-        }
-    }
-
+    // MARK: - ⌘V simulator
     private func sendPasteShortcut() {
         guard let src = CGEventSource(stateID: .hidSystemState) else { return }
         let down = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true) // "V"

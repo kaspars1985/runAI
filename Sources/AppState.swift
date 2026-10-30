@@ -189,8 +189,8 @@ final class AppState: ObservableObject {
                 if text.isEmpty {
                     self.finishTranscription(text: nil, error: "Nekas netika atpazīts")
                 } else {
-                    self.inserter.insert(text)
-                    self.finishTranscription(text: text, error: nil)
+                    let outcome = self.inserter.insert(text)
+                    self.finishTranscription(text: text, outcome: outcome, error: nil)
                 }
             case .failure(let err):
                 self.finishTranscription(text: nil, error: err.localizedDescription)
@@ -198,15 +198,22 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func finishTranscription(text: String?, error: String?) {
+    private func finishTranscription(text: String?, outcome: TextInserter.InsertOutcome = .insertedDirectly, error: String?) {
         if let error = error {
             AppLogger.error("finishTranscription kļūda: \(error)")
             status = .error(error)
             showHUD(text: error)
         } else if let text = text, !text.isEmpty {
-            AppLogger.info("finishTranscription: ievietots \(text.count) simbolu")
+            AppLogger.info("finishTranscription: \(text.count) simbolu, iznākums: \(outcome)")
             status = .copied
-            showHUD(text: "Ievietots")
+            let message: String
+            switch outcome {
+            case .insertedDirectly, .pastedViaShortcut:
+                message = "Ievietots"
+            case .copiedOnly:
+                message = "Nokopēts (⌘V)"
+            }
+            showHUD(text: message)
         } else {
             AppLogger.info("finishTranscription: tukšs rezultāts")
             status = .ready
