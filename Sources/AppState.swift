@@ -34,6 +34,7 @@ final class AppState: ObservableObject {
     @Published var menuBarIconStyle: MenuBarIconStyle = .waveform
     @Published var appTheme: AppTheme = .system
     @Published var autoCheckUpdates: Bool = true
+    @Published var blurBackdrop: Bool = true
 
     let modelManager = ModelManager()
     let updateChecker = UpdateChecker()
@@ -85,6 +86,11 @@ final class AppState: ObservableObject {
         } else {
             autoCheckUpdates = true
         }
+        if UserDefaults.standard.object(forKey: "blurBackdrop") != nil {
+            blurBackdrop = UserDefaults.standard.bool(forKey: "blurBackdrop")
+        } else {
+            blurBackdrop = true
+        }
 
         // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
         if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
@@ -109,6 +115,7 @@ final class AppState: ObservableObject {
 
         // Piemēro izvēlēto izskata tēmu
         NSApp.appearance = appTheme.nsAppearance
+        hud.blurBackdropEnabled = blurBackdrop
 
         refreshInputDevices()
         refreshModels()
@@ -392,6 +399,12 @@ final class AppState: ObservableObject {
     func setAutoCheckUpdates(_ enabled: Bool) {
         autoCheckUpdates = enabled
         UserDefaults.standard.set(enabled, forKey: "autoCheckUpdates")
+    }
+
+    func setBlurBackdrop(_ enabled: Bool) {
+        blurBackdrop = enabled
+        UserDefaults.standard.set(enabled, forKey: "blurBackdrop")
+        hud.blurBackdropEnabled = enabled
     }
 
     func setHotkey(_ h: Hotkey) {

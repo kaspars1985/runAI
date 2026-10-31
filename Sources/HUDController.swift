@@ -4,8 +4,11 @@ import QuartzCore
 /// Virsū peldošs tumša stikla HUD logs ar neona viļņu animāciju.
 /// Rāda ierakstīšanas, atšifrēšanas un pabeigšanas stāvokļus.
 final class HUDController {
+    var blurBackdropEnabled: Bool = true
+
     private let panel: NSPanel
     private let hudView = HUDView()
+    private var backdropPanels: [NSPanel] = []
 
     // 60 FPS animācijas taimeris — darbojas tikai kamēr HUD ir redzams.
     private var animationTimer: Timer?
@@ -85,6 +88,7 @@ final class HUDController {
     /// Paslēpj HUD un aptur animāciju (0% CPU idle).
     func hide() {
         stopAnimation()
+        hideBackdrop()
         isVisible = false
         panel.orderOut(nil)
     }
@@ -92,11 +96,70 @@ final class HUDController {
     // MARK: - Privātās metodes
 
     private func present() {
+        showBackdrop()
         positionOnScreen()
         panel.appearance = NSApp.appearance
         panel.orderFrontRegardless()
         isVisible = true
         startAnimation()
+    }
+
+    private func showBackdrop() {
+        guard blurBackdropEnabled else { return }
+        guard backdropPanels.isEmpty else { return }
+
+        for screen in NSScreen.screens {
+            let bPanel = NSPanel(contentRect: screen.frame,
+                                 styleMask: [.borderless, .nonactivatingPanel],
+                                 backing: .buffered,
+                                 defer: false)
+            bPanel.isOpaque = false
+            bPanel.backgroundColor = .clear
+            bPanel.hasShadow = false
+            bPanel.level = .statusBar - 1
+            bPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            bPanel.ignoresMouseEvents = true
+            bPanel.isMovable = false
+            bPanel.hidesOnDeactivate = false
+
+            let visualEffect = NSVisualEffectView(frame: bPanel.contentView!.bounds)
+            visualEffect.autoresizingMask = [.width, .height]
+            visualEffect.material = .fullScreenUI
+            visualEffect.blendingMode = .behindWindow
+            visualEffect.state = .active
+
+            let overlay = NSView(frame: visualEffect.bounds)
+            overlay.autoresizingMask = [.width, .height]
+            overlay.wantsLayer = true
+            overlay.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.20).cgColor
+            visualEffect.addSubview(overlay)
+
+            bPanel.contentView = visualEffect
+            bPanel.alphaValue = 0.0
+            bPanel.orderFrontRegardless()
+
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.22
+                bPanel.animator().alphaValue = 0.85
+            }
+            backdropPanels.append(bPanel)
+        }
+    }
+
+    private func hideBackdrop() {
+        let panels = backdropPanels
+        backdropPanels = []
+        guard !panels.isEmpty else { return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.20
+            for p in panels {
+                p.animator().alphaValue = 0.0
+            }
+        }, completionHandler: {
+            for p in panels {
+                p.orderOut(nil)
+            }
+        })
     }
 
     private func startAnimation() {

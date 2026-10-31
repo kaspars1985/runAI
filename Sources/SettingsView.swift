@@ -369,6 +369,24 @@ struct SettingsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+
+                Divider().opacity(0.5)
+
+                // Gaussian Blur fokusa fons
+                Toggle(isOn: Binding(
+                    get: { state.blurBackdrop },
+                    set: { state.setBlurBackdrop($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aizmiglot ekrāna fonu (Gaussian Blur fokuss)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(colors.textPrimary)
+                        Text("Diktēšanas laikā fons aiz HUD tiek maigi izpludināts kinemātiskam fokusam.")
+                            .font(.system(size: 10))
+                            .foregroundColor(colors.textMuted)
+                    }
+                }
+                .toggleStyle(.checkbox)
             }
         }
     }
