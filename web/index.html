@@ -128,9 +128,73 @@
     }
 
     /* ===== React Bits style DecryptedText & Wordplay Pill ===== */
+    .wordplay-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .wordplay-slot-lv {
+      display: inline-flex;
+      align-items: center;
+      max-width: 260px;
+      opacity: 1;
+      filter: blur(0px);
+      margin-right: 0.5rem;
+      transition: max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.35s ease,
+                  filter 0.35s ease,
+                  margin 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: visible;
+    }
+
+    .wordplay-slot-ltg {
+      display: inline-flex;
+      align-items: center;
+      opacity: 1;
+      filter: blur(0px);
+      transition: opacity 0.35s ease,
+                  filter 0.35s ease,
+                  transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* State: Hover / Focus on [viski] -> [galiski] dims and blurs */
+    .wordplay-wrapper[data-state="lv"] .wordplay-slot-lv,
+    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-lv {
+      opacity: 1;
+      filter: blur(0px);
+    }
+    .wordplay-wrapper[data-state="lv"] .wordplay-slot-ltg,
+    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-ltg {
+      opacity: 0.25;
+      filter: blur(4px);
+      transform: scale(0.96);
+    }
+
+    /* State: Hover / Focus on [galiski] -> LAT covers [viski], collapses [viski], glides [galiski] */
+    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-lv,
+    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-lv {
+      max-width: 0px;
+      opacity: 0;
+      filter: blur(6px);
+      margin-right: 0px;
+      transform: translateX(-18px) scale(0.9);
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-ltg,
+    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-ltg {
+      opacity: 1;
+      filter: blur(0px);
+      transform: scale(1.02);
+    }
+
     .wordplay-pill {
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+      white-space: nowrap;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .wordplay-pill:hover {
@@ -1008,16 +1072,22 @@
 
     <!-- Hero Title -->
     <h1 class="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 text-glow leading-[1.2]">
-      <span class="inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+      <span class="inline-flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2">
         <span>Diktē</span>
-        <span class="font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span><span class="inline-flex items-center gap-2">
-          <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda (noklikšķini, lai izmēģinātu)">
-            <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
+        <span class="wordplay-wrapper" id="wordplayWrapper" data-state="none">
+          <span class="relative z-10 font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span>
+          <span class="wordplay-slot-lv">
+            <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda">
+              <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
+            </span>
           </span>
-          <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda (noklikšķini, lai izmēģinātu)">
-            <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
+          <span class="wordplay-slot-ltg">
+            <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda">
+              <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
+            </span>
           </span>
-        </span><span>!</span>
+        </span>
+        <span class="text-white">!</span>
       </span>
       <span class="text-zinc-400 font-normal text-xl sm:text-3xl lg:text-4xl block mt-4 tracking-normal">Teksts parādīsies tur, kur ir kursors</span>
     </h1>
@@ -1988,11 +2058,14 @@
     /* ===== React Bits style DecryptedText Scramble for LAT[viski] [galiski] ===== */
     (function initDecryptedTextEffect() {
       const glyphs = "!@#$%^&*~?0123456789abcdefghijklmnopqrstuvwxyz";
+      const wrapper = document.getElementById("wordplayWrapper");
       const pills = document.querySelectorAll(".wordplay-pill");
 
       pills.forEach(pill => {
         const targetWord = pill.getAttribute("data-word");
         const span = pill.querySelector(".scramble-target");
+        const isLtg = pill.classList.contains("wordplay-ltg");
+        const mode = isLtg ? "ltg" : "lv";
         if (!span || !targetWord) return;
 
         let interval = null;
@@ -2021,25 +2094,61 @@
           }, 25);
         }
 
-        pill.addEventListener("mouseenter", scramble);
-        pill.addEventListener("click", () => {
+        pill.addEventListener("mouseenter", () => {
+          if (wrapper) wrapper.setAttribute("data-state", mode);
           scramble();
-          const dialect = pill.classList.contains("wordplay-lv") ? "lv" : "ltg";
+        });
+
+        pill.addEventListener("mouseleave", () => {
+          if (wrapper) wrapper.setAttribute("data-state", "none");
+        });
+
+        pill.addEventListener("click", (e) => {
+          e.stopPropagation();
+          scramble();
+          if (wrapper) {
+            const current = wrapper.getAttribute("data-state");
+            const next = current === mode ? "none" : mode;
+            wrapper.setAttribute("data-state", next);
+          }
           if (window.setDemoDialect) {
-            window.setDemoDialect(dialect);
+            window.setDemoDialect(mode);
           }
         });
+      });
+
+      // Mobile / outside click reset
+      document.addEventListener("click", (e) => {
+        if (wrapper && !wrapper.contains(e.target)) {
+          wrapper.setAttribute("data-state", "none");
+        }
       });
 
       // Periodiska viegla alternējoša atšifrēšanas animācija dīkstāvē
       let toggle = false;
       setInterval(() => {
+        if (wrapper && (wrapper.matches(":hover") || wrapper.getAttribute("data-state") !== "none")) return;
         const p = document.querySelector(toggle ? ".wordplay-ltg" : ".wordplay-lv");
         toggle = !toggle;
-        if (p && !p.matches(":hover")) {
-          p.dispatchEvent(new Event("mouseenter"));
+        if (p) {
+          const span = p.querySelector(".scramble-target");
+          const word = p.getAttribute("data-word");
+          if (!span || !word) return;
+          let iter = 0;
+          const maxIter = word.length * 2;
+          const timer = setInterval(() => {
+            span.textContent = word
+              .split("")
+              .map((c, i) => (i < iter / 2 ? word[i] : glyphs[Math.floor(Math.random() * glyphs.length)]))
+              .join("");
+            if (iter >= maxIter) {
+              clearInterval(timer);
+              span.textContent = word;
+            }
+            iter++;
+          }, 30);
         }
-      }, 6000);
+      }, 7000);
     })();
   </script>
 
