@@ -132,7 +132,7 @@
       position: relative;
       display: inline-flex;
       align-items: center;
-      --wordplay-shift-x: 135px;
+      --wordplay-shift-x: 124px;
       --wordplay-punct-shift-x: 140px;
     }
 
@@ -200,7 +200,7 @@
     /* State: Hover / Focus on [galiski] -> LAT glides onto [viski], touching [galiski] */
     .wordplay-wrapper[data-state="ltg"] .wordplay-stem,
     .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-stem {
-      transform: translateX(var(--wordplay-shift-x, 135px));
+      transform: translateX(var(--wordplay-shift-x, 124px));
     }
     .wordplay-wrapper[data-state="ltg"] .wordplay-slot-lv,
     .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-lv {
@@ -213,7 +213,7 @@
     .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-ltg {
       opacity: 1;
       filter: blur(0px);
-      transform: scale(1.02);
+      transform: none;
     }
     .wordplay-wrapper[data-state="ltg"] .wordplay-punct,
     .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-punct {
@@ -2101,20 +2101,26 @@
 
         const prevStemTransform = stem.style.transform;
         const prevPunctTransform = punct.style.transform;
+        const prevLvTransform = lv.style.transform;
+        const prevLtgTransform = ltg.style.transform;
         stem.style.transform = "none";
         punct.style.transform = "none";
+        lv.style.transform = "none";
+        ltg.style.transform = "none";
 
         const latRect = lat.getBoundingClientRect();
         const lvRect = lv.getBoundingClientRect();
         const ltgRect = ltg.getBoundingClientRect();
         const punctRect = punct.getBoundingClientRect();
 
-        const stemShift = Math.round(ltgRect.left - latRect.right);
+        const stemShift = Math.round(ltgRect.left - lvRect.left);
         const gap = window.innerWidth < 640 ? 2 : 4;
         const punctShift = Math.round(punctRect.left - lvRect.right - gap);
 
         stem.style.transform = prevStemTransform;
         punct.style.transform = prevPunctTransform;
+        lv.style.transform = prevLvTransform;
+        ltg.style.transform = prevLtgTransform;
 
         if (stemShift > 0) {
           wrapper.style.setProperty("--wordplay-shift-x", `${stemShift}px`);
