@@ -151,7 +151,7 @@ struct MenuBarView: View {
             }
             .padding(.bottom, 2)
 
-            // Kartīte: Pašreizējais modelis un taustiņš
+            // Kartīte: Pašreizējais modelis, mikrofons un taustiņš
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Modelis")
@@ -162,6 +162,20 @@ struct MenuBarView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(colors.textPrimary)
                         .lineLimit(1)
+                }
+
+                Divider().opacity(0.4)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Mikrofons")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(colors.textMuted)
+                    Spacer()
+                    Text(state.selectedInputTitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(colors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
 
                 Divider().opacity(0.4)
@@ -210,7 +224,7 @@ struct MenuBarView: View {
             }
         }
         .padding(12)
-        .frame(width: 250)
+        .frame(width: 260)
         .background(colors.canvasBg)
     }
 

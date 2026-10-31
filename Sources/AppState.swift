@@ -651,4 +651,17 @@ final class AppState: ObservableObject {
         }
         return "—"
     }
+
+    var selectedInputTitle: String {
+        if inputDevices.isEmpty {
+            return "Nav mikrofona"
+        }
+        if let id = selectedInputID, let dev = inputDevices.first(where: { $0.id == id }) {
+            return dev.name
+        }
+        if let def = AudioDevices.defaultInputUID(), let dev = inputDevices.first(where: { $0.id == def }) {
+            return dev.name
+        }
+        return inputDevices.first?.name ?? "Sistēmas noklusētais"
+    }
 }
