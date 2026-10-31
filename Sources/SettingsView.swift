@@ -304,7 +304,7 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("Latviešu valodai ieteicams AiLab modelis, angļu — Large v3 Turbo.")
+                    Text("Latviešu valodai ieteicams AiLab LV, latgaliešu — AiLab Latgalian, angļu — Large v3 Turbo.")
                         .font(.system(size: 10.5))
                         .foregroundColor(colors.textMuted)
                         .fixedSize(horizontal: false, vertical: true)

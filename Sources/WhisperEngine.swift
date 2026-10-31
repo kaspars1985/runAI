@@ -80,7 +80,9 @@ final class WhisperEngine: @unchecked Sendable {
             var resultText = ""
 
             if forced {
-                language.withCString { langPtr in
+                // Latgaliešu modelis izmanto "lv" valodas marķieri Whisper modelī
+                let effectiveLang = (language == "ltg") ? "lv" : language
+                effectiveLang.withCString { langPtr in
                     params.language = langPtr
                     params.detect_language = false
                     samples.withUnsafeBufferPointer { buf in

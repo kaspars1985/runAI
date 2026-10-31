@@ -93,6 +93,13 @@ struct ModelEntry: Identifiable, Equatable, Hashable {
                    languageSupport: "Latviešu: izcili (kompakts)",
                    customURL: "https://huggingface.co/AiLab-IMCS-UL/whisper-large-v3-lv-late-cv19/resolve/main/ggml-model-q5_0.bin",
                    recommendation: nil),
+        ModelEntry(fileName: "ggml-whisper-large-v3-latgalian-2503-q8_0.bin",
+                   title: "AiLab Large v3 Latgalian (q8)",
+                   note: "Ieteicamais latgaliešu valodai. Latvijas Universitātes MII modelis (MuLaR + CV20). Pielāgots latgaliešu runai un rakstībai.",
+                   sizeMB: 1580,
+                   languageSupport: "Latgaliešu: izcili (ieteicams)",
+                   customURL: "https://huggingface.co/AiLab-IMCS-UL/whisper-large-v3-latgalian-2503/resolve/main/ggml-whisper-large-v3-latgalian-2503-q8_0.bin?download=true",
+                   recommendation: "Ieteicams latgaliešu valodai"),
         ModelEntry(fileName: "ggml-large-v3-turbo-q8_0.bin",
                    title: "Large v3 Turbo (q8)",
                    note: "Ieteicamais angļu un citām valodām. OpenAI oficiālais turbo modelis — zibenīgs ātrums un augsta precizitāte.",
@@ -196,6 +203,7 @@ struct LanguageOption: Identifiable, Equatable {
 
     static let all: [LanguageOption] = [
         LanguageOption(code: "lv", title: "Latviešu"),
+        LanguageOption(code: "ltg", title: "Latgaliešu"),
         LanguageOption(code: "en", title: "Angļu"),
         LanguageOption(code: "auto", title: "Automātiski (noteikt pēc balss)"),
     ]
