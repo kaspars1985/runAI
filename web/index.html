@@ -605,7 +605,7 @@
         <img src="icon.png" alt="runAI ikona" class="w-8 h-8 rounded-lg shadow-sm">
         <div class="flex items-baseline gap-2">
           <span class="font-semibold text-lg tracking-tight">runAI</span>
-          <span id="nav-version" class="text-xs font-mono px-2 py-0.5 rounded-full bg-white/10 text-zinc-300">v2.4.0</span>
+          <span id="nav-version" class="text-xs font-mono px-2 py-0.5 rounded-full bg-white/10 text-zinc-300">v2.4.1</span>
         </div>
       </div>
       <div class="flex items-center gap-4 text-sm">
@@ -1005,7 +1005,7 @@
 
     <!-- Meta Info: Version & Size -->
     <div class="text-xs text-zinc-500 flex items-center justify-center gap-3">
-      <span>Versija: <strong id="hero-version" class="text-zinc-300 font-mono">v2.4.0</strong></span>
+      <span>Versija: <strong id="hero-version" class="text-zinc-300 font-mono">v2.4.1</strong></span>
       <span>·</span>
       <span>Izmērs: <strong id="hero-size" class="text-zinc-300">~5.5 MB</strong></span>
       <span>·</span>
@@ -1250,7 +1250,7 @@
               <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.06-7.73-7.91-12.13-14.54-5.91-8.91-10.45-18.9-13.62-29.98-3.17-11.08-4.76-21.75-4.76-32.01 0-14.93 3.82-27.27 11.45-37.03 7.64-9.75 17.14-14.77 28.51-15.06 4.9 0 10.22 1.3 15.97 3.91 5.75 2.61 9.4 3.99 10.95 4.13 2.18-.32 6.13-1.8 11.87-4.44 5.74-2.64 10.74-3.83 15-3.56 12.98.83 23.32 5.56 31.02 14.18-11.46 6.94-17.06 16.58-16.8 28.93.26 10.15 4.17 18.59 11.73 25.32 4.13 3.69 8.86 6.46 14.18 8.31-2.92 8.79-6.46 17.39-10.63 25.8zM119.22 31.81c0-7.72 2.76-14.96 8.28-21.73 5.52-6.77 12.35-10.74 20.48-11.91.52 1.04.78 2.21.78 3.51 0 7.59-2.82 14.74-8.47 21.46-5.65 6.72-12.65 10.59-21 11.62-.05-1-.07-1.98-.07-2.95z"/>
             </svg>
             <span class="text-black group-hover:text-white transition-colors">Lejupielādēt runAI</span>
-            <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-black/10 text-black group-hover:bg-white/10 group-hover:text-white transition-colors" id="cta-version">v2.4.0</span>
+            <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-black/10 text-black group-hover:bg-white/10 group-hover:text-white transition-colors" id="cta-version">v2.4.1</span>
             <svg class="w-4 h-4 transition-transform duration-500 group-hover:translate-x-2 text-black group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
             </svg>
@@ -1282,7 +1282,7 @@
         if (!res.ok) return;
         const data = await res.json();
         
-        const tagName = data.tag_name || 'v2.4.0';
+        const tagName = data.tag_name || 'v2.4.1';
         
         // Find dmg asset
         const dmgAsset = data.assets && data.assets.find(a => a.name.endsWith('.dmg'));
@@ -1840,7 +1840,7 @@
           textLayer.setAttribute("data-glow", "true");
 
           pill.setAttribute("data-state", "done");
-          pillText.textContent = isMobile ? "✓ Teksts kursorā" : "✓ Teksts ievietots kursorā";
+          pillText.textContent = "✓ Teksts gatavs";
           timerEl.textContent = isMobile ? "Lokāli" : "100% lokāli";
 
           if (step1) step1.setAttribute("data-active", "none");

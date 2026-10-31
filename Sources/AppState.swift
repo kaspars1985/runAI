@@ -262,7 +262,7 @@ final class AppState: ObservableObject {
             let message: String
             switch outcome {
             case .insertedDirectly, .pastedViaShortcut:
-                message = "Teksts ievietots kursorā"
+                message = "Teksts gatavs"
             case .copiedOnly:
                 message = "Nokopēts (⌘V)"
             }
