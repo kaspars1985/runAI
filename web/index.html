@@ -180,43 +180,34 @@
     }
 
     /* State: Hover / Focus on [viski] -> [galiski] fades, ! glides left to touch [viski] */
-    .wordplay-wrapper[data-state="lv"] .wordplay-slot-lv,
-    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-lv {
+    .wordplay-wrapper[data-state="lv"] .wordplay-slot-lv {
       opacity: 1;
       filter: blur(0px);
     }
-    .wordplay-wrapper[data-state="lv"] .wordplay-slot-ltg,
-    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-ltg {
+    .wordplay-wrapper[data-state="lv"] .wordplay-slot-ltg {
       opacity: 0;
       filter: blur(8px);
-      transform: scale(0.9);
       pointer-events: none;
     }
-    .wordplay-wrapper[data-state="lv"] .wordplay-punct,
-    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-punct {
+    .wordplay-wrapper[data-state="lv"] .wordplay-punct {
       transform: translateX(calc(-1 * var(--wordplay-punct-shift-x, 140px)));
     }
 
     /* State: Hover / Focus on [galiski] -> LAT glides onto [viski], touching [galiski] */
-    .wordplay-wrapper[data-state="ltg"] .wordplay-stem,
-    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-stem {
+    .wordplay-wrapper[data-state="ltg"] .wordplay-stem {
       transform: translateX(var(--wordplay-shift-x, 124px));
     }
-    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-lv,
-    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-lv {
+    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-lv {
       opacity: 0;
       filter: blur(8px);
-      transform: scale(0.9);
       pointer-events: none;
     }
-    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-ltg,
-    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-ltg {
+    .wordplay-wrapper[data-state="ltg"] .wordplay-slot-ltg {
       opacity: 1;
       filter: blur(0px);
       transform: none;
     }
-    .wordplay-wrapper[data-state="ltg"] .wordplay-punct,
-    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-punct {
+    .wordplay-wrapper[data-state="ltg"] .wordplay-punct {
       transform: translateX(0);
     }
 
@@ -1116,7 +1107,7 @@
             <span class="text-[#60a5fa]/60 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-[#60a5fa]/60 font-sans font-light select-none ml-0.5">]</span>
           </span>
         </span>
-        <span class="wordplay-punct text-white ml-0.5 sm:ml-1">!</span>
+        <span class="wordplay-punct inline-flex items-center text-white ml-0.5 sm:ml-1">!</span>
       </span>
       <span class="text-zinc-400 font-normal text-xl sm:text-3xl lg:text-4xl block mt-4 tracking-normal">Teksts parādīsies tur, kur ir kursors</span>
     </h1>
@@ -2092,35 +2083,15 @@
 
       function updateShift() {
         if (!wrapper) return;
-        const lat = wrapper.querySelector(".wordplay-lat");
         const lv = wrapper.querySelector(".wordplay-slot-lv");
         const ltg = wrapper.querySelector(".wordplay-slot-ltg");
-        const stem = wrapper.querySelector(".wordplay-stem");
         const punct = wrapper.querySelector(".wordplay-punct");
-        if (!lat || !lv || !ltg || !stem || !punct) return;
+        if (!lv || !ltg || !punct) return;
 
-        const prevStemTransform = stem.style.transform;
-        const prevPunctTransform = punct.style.transform;
-        const prevLvTransform = lv.style.transform;
-        const prevLtgTransform = ltg.style.transform;
-        stem.style.transform = "none";
-        punct.style.transform = "none";
-        lv.style.transform = "none";
-        ltg.style.transform = "none";
-
-        const latRect = lat.getBoundingClientRect();
-        const lvRect = lv.getBoundingClientRect();
-        const ltgRect = ltg.getBoundingClientRect();
-        const punctRect = punct.getBoundingClientRect();
-
-        const stemShift = Math.round(ltgRect.left - lvRect.left);
+        // Use offsetLeft which is layout-derived and completely unaffected by active CSS transforms or transitions
+        const stemShift = Math.round(ltg.offsetLeft - lv.offsetLeft);
         const gap = window.innerWidth < 640 ? 2 : 4;
-        const punctShift = Math.round(punctRect.left - lvRect.right - gap);
-
-        stem.style.transform = prevStemTransform;
-        punct.style.transform = prevPunctTransform;
-        lv.style.transform = prevLvTransform;
-        ltg.style.transform = prevLtgTransform;
+        const punctShift = Math.round(punct.offsetLeft - (lv.offsetLeft + lv.offsetWidth) - gap);
 
         if (stemShift > 0) {
           wrapper.style.setProperty("--wordplay-shift-x", `${stemShift}px`);
@@ -2131,7 +2102,11 @@
       }
 
       window.addEventListener("resize", updateShift);
-      setTimeout(updateShift, 100);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateShift);
+      }
+      setTimeout(updateShift, 50);
+      setTimeout(updateShift, 200);
       setTimeout(updateShift, 600);
 
       pills.forEach(pill => {
@@ -2168,7 +2143,6 @@
         }
 
         pill.addEventListener("mouseenter", () => {
-          updateShift();
           if (wrapper) wrapper.setAttribute("data-state", mode);
           scramble();
         });
@@ -2179,7 +2153,6 @@
 
         pill.addEventListener("click", (e) => {
           e.stopPropagation();
-          updateShift();
           scramble();
           if (wrapper) {
             const current = wrapper.getAttribute("data-state");
