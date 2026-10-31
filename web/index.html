@@ -132,32 +132,47 @@
       position: relative;
       display: inline-flex;
       align-items: center;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      --wordplay-shift-x: 135px;
+    }
+
+    .wordplay-stem {
+      display: inline-flex;
+      align-items: center;
+      position: relative;
+      z-index: 20;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
     }
 
     .wordplay-slot-lv {
       display: inline-flex;
       align-items: center;
-      max-width: 260px;
+      position: relative;
+      z-index: 10;
       opacity: 1;
       filter: blur(0px);
-      margin-right: 0.5rem;
-      transition: max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-                  opacity 0.35s ease,
+      transition: opacity 0.35s ease,
                   filter 0.35s ease,
-                  margin 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-      overflow: visible;
+                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, opacity, filter;
     }
 
     .wordplay-slot-ltg {
       display: inline-flex;
       align-items: center;
+      position: relative;
+      z-index: 20;
       opacity: 1;
       filter: blur(0px);
       transition: opacity 0.35s ease,
                   filter 0.35s ease,
-                  transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+                  transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .wordplay-punct {
+      position: relative;
+      z-index: 20;
+      user-select: none;
     }
 
     /* State: Hover / Focus on [viski] -> [galiski] dims and blurs */
@@ -173,15 +188,16 @@
       transform: scale(0.96);
     }
 
-    /* State: Hover / Focus on [galiski] -> LAT covers [viski], collapses [viski], glides [galiski] */
+    /* State: Hover / Focus on [galiski] -> LAT glides onto [viski], touching [galiski] */
+    .wordplay-wrapper[data-state="ltg"] .wordplay-stem,
+    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-stem {
+      transform: translateX(var(--wordplay-shift-x, 135px));
+    }
     .wordplay-wrapper[data-state="ltg"] .wordplay-slot-lv,
     .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-slot-lv {
-      max-width: 0px;
       opacity: 0;
-      filter: blur(6px);
-      margin-right: 0px;
-      transform: translateX(-18px) scale(0.9);
-      overflow: hidden;
+      filter: blur(8px);
+      transform: scale(0.9);
       pointer-events: none;
     }
     .wordplay-wrapper[data-state="ltg"] .wordplay-slot-ltg,
@@ -1072,22 +1088,22 @@
 
     <!-- Hero Title -->
     <h1 class="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 text-glow leading-[1.2]">
-      <span class="inline-flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2">
-        <span>Diktē</span>
-        <span class="wordplay-wrapper" id="wordplayWrapper" data-state="none">
-          <span class="relative z-10 font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span>
-          <span class="wordplay-slot-lv">
-            <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda">
-              <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
-            </span>
-          </span>
-          <span class="wordplay-slot-ltg">
-            <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda">
-              <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
-            </span>
+      <span class="wordplay-wrapper inline-flex items-center justify-center" id="wordplayWrapper" data-state="none">
+        <span class="wordplay-stem inline-flex items-center">
+          <span class="mr-2 sm:mr-3">Diktē</span>
+          <span class="wordplay-lat font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span>
+        </span>
+        <span class="wordplay-slot-lv inline-flex items-center ml-0 mr-2 sm:mr-2.5">
+          <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda">
+            <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
           </span>
         </span>
-        <span class="text-white">!</span>
+        <span class="wordplay-slot-ltg inline-flex items-center">
+          <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda">
+            <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
+          </span>
+        </span>
+        <span class="wordplay-punct text-white ml-0.5 sm:ml-1">!</span>
       </span>
       <span class="text-zinc-400 font-normal text-xl sm:text-3xl lg:text-4xl block mt-4 tracking-normal">Teksts parādīsies tur, kur ir kursors</span>
     </h1>
@@ -2061,6 +2077,29 @@
       const wrapper = document.getElementById("wordplayWrapper");
       const pills = document.querySelectorAll(".wordplay-pill");
 
+      function updateShift() {
+        if (!wrapper) return;
+        const lat = wrapper.querySelector(".wordplay-lat");
+        const ltg = wrapper.querySelector(".wordplay-slot-ltg");
+        const stem = wrapper.querySelector(".wordplay-stem");
+        if (!lat || !ltg || !stem) return;
+
+        const prevTransform = stem.style.transform;
+        stem.style.transform = "none";
+        const latRect = lat.getBoundingClientRect();
+        const ltgRect = ltg.getBoundingClientRect();
+        const shift = Math.round(ltgRect.left - latRect.right);
+        stem.style.transform = prevTransform;
+
+        if (shift > 0) {
+          wrapper.style.setProperty("--wordplay-shift-x", `${shift}px`);
+        }
+      }
+
+      window.addEventListener("resize", updateShift);
+      setTimeout(updateShift, 100);
+      setTimeout(updateShift, 600);
+
       pills.forEach(pill => {
         const targetWord = pill.getAttribute("data-word");
         const span = pill.querySelector(".scramble-target");
@@ -2095,6 +2134,7 @@
         }
 
         pill.addEventListener("mouseenter", () => {
+          updateShift();
           if (wrapper) wrapper.setAttribute("data-state", mode);
           scramble();
         });
@@ -2105,6 +2145,7 @@
 
         pill.addEventListener("click", (e) => {
           e.stopPropagation();
+          updateShift();
           scramble();
           if (wrapper) {
             const current = wrapper.getAttribute("data-state");
