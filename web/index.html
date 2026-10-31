@@ -133,6 +133,7 @@
       display: inline-flex;
       align-items: center;
       --wordplay-shift-x: 135px;
+      --wordplay-punct-shift-x: 140px;
     }
 
     .wordplay-stem {
@@ -166,16 +167,19 @@
       filter: blur(0px);
       transition: opacity 0.35s ease,
                   filter 0.35s ease,
-                  transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, opacity, filter;
     }
 
     .wordplay-punct {
       position: relative;
       z-index: 20;
       user-select: none;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
     }
 
-    /* State: Hover / Focus on [viski] -> [galiski] dims and blurs */
+    /* State: Hover / Focus on [viski] -> [galiski] fades, ! glides left to touch [viski] */
     .wordplay-wrapper[data-state="lv"] .wordplay-slot-lv,
     .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-lv {
       opacity: 1;
@@ -183,9 +187,14 @@
     }
     .wordplay-wrapper[data-state="lv"] .wordplay-slot-ltg,
     .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-slot-ltg {
-      opacity: 0.25;
-      filter: blur(4px);
-      transform: scale(0.96);
+      opacity: 0;
+      filter: blur(8px);
+      transform: scale(0.9);
+      pointer-events: none;
+    }
+    .wordplay-wrapper[data-state="lv"] .wordplay-punct,
+    .wordplay-wrapper:has(.wordplay-lv:hover) .wordplay-punct {
+      transform: translateX(calc(-1 * var(--wordplay-punct-shift-x, 140px)));
     }
 
     /* State: Hover / Focus on [galiski] -> LAT glides onto [viski], touching [galiski] */
@@ -206,6 +215,10 @@
       filter: blur(0px);
       transform: scale(1.02);
     }
+    .wordplay-wrapper[data-state="ltg"] .wordplay-punct,
+    .wordplay-wrapper:has(.wordplay-ltg:hover) .wordplay-punct {
+      transform: translateX(0);
+    }
 
     .wordplay-pill {
       backdrop-filter: blur(12px);
@@ -219,19 +232,19 @@
     .wordplay-pill:active {
       transform: scale(0.96);
     }
-    @keyframes pill-pulse-emerald {
-      0%, 100% { box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.25); }
-      50% { box-shadow: 0 0 32px 0px rgba(16, 185, 129, 0.5); }
+    @keyframes pill-pulse-carmine {
+      0%, 100% { box-shadow: 0 0 20px -3px rgba(158, 48, 57, 0.3); }
+      50% { box-shadow: 0 0 32px 0px rgba(189, 56, 67, 0.6); }
     }
-    @keyframes pill-pulse-amber {
-      0%, 100% { box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.25); }
-      50% { box-shadow: 0 0 32px 0px rgba(245, 158, 11, 0.5); }
+    @keyframes pill-pulse-latgale {
+      0%, 100% { box-shadow: 0 0 20px -3px rgba(0, 56, 130, 0.3); }
+      50% { box-shadow: 0 0 32px 0px rgba(37, 99, 235, 0.6); }
     }
     .wordplay-lv {
-      animation: pill-pulse-emerald 4s ease-in-out infinite;
+      animation: pill-pulse-carmine 4s ease-in-out infinite;
     }
     .wordplay-ltg {
-      animation: pill-pulse-amber 4s ease-in-out infinite 2s;
+      animation: pill-pulse-latgale 4s ease-in-out infinite 2s;
     }
 
     /* ===== Animated runAI hero icon (1:1 faithful SVG) ===== */
@@ -1094,13 +1107,13 @@
           <span class="wordplay-lat font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span>
         </span>
         <span class="wordplay-slot-lv inline-flex items-center ml-0 mr-2 sm:mr-2.5">
-          <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda">
-            <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
+          <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-[#9E3039]/15 border border-[#9E3039]/40 text-[#ff8592] font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(158,48,57,0.4)] hover:scale-105 hover:bg-[#9E3039]/25 hover:border-[#d4434f]/70 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda">
+            <span class="text-[#ff8592]/60 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-[#ff8592]/60 font-sans font-light select-none ml-0.5">]</span>
           </span>
         </span>
         <span class="wordplay-slot-ltg inline-flex items-center">
-          <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda">
-            <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
+          <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-[#003882]/20 border border-[#0047AB]/45 text-[#60a5fa] font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(0,71,171,0.4)] hover:scale-105 hover:bg-[#003882]/35 hover:border-[#3b82f6]/70 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda">
+            <span class="text-[#60a5fa]/60 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-[#60a5fa]/60 font-sans font-light select-none ml-0.5">]</span>
           </span>
         </span>
         <span class="wordplay-punct text-white ml-0.5 sm:ml-1">!</span>
@@ -2080,19 +2093,34 @@
       function updateShift() {
         if (!wrapper) return;
         const lat = wrapper.querySelector(".wordplay-lat");
+        const lv = wrapper.querySelector(".wordplay-slot-lv");
         const ltg = wrapper.querySelector(".wordplay-slot-ltg");
         const stem = wrapper.querySelector(".wordplay-stem");
-        if (!lat || !ltg || !stem) return;
+        const punct = wrapper.querySelector(".wordplay-punct");
+        if (!lat || !lv || !ltg || !stem || !punct) return;
 
-        const prevTransform = stem.style.transform;
+        const prevStemTransform = stem.style.transform;
+        const prevPunctTransform = punct.style.transform;
         stem.style.transform = "none";
-        const latRect = lat.getBoundingClientRect();
-        const ltgRect = ltg.getBoundingClientRect();
-        const shift = Math.round(ltgRect.left - latRect.right);
-        stem.style.transform = prevTransform;
+        punct.style.transform = "none";
 
-        if (shift > 0) {
-          wrapper.style.setProperty("--wordplay-shift-x", `${shift}px`);
+        const latRect = lat.getBoundingClientRect();
+        const lvRect = lv.getBoundingClientRect();
+        const ltgRect = ltg.getBoundingClientRect();
+        const punctRect = punct.getBoundingClientRect();
+
+        const stemShift = Math.round(ltgRect.left - latRect.right);
+        const gap = window.innerWidth < 640 ? 2 : 4;
+        const punctShift = Math.round(punctRect.left - lvRect.right - gap);
+
+        stem.style.transform = prevStemTransform;
+        punct.style.transform = prevPunctTransform;
+
+        if (stemShift > 0) {
+          wrapper.style.setProperty("--wordplay-shift-x", `${stemShift}px`);
+        }
+        if (punctShift > 0) {
+          wrapper.style.setProperty("--wordplay-punct-shift-x", `${punctShift}px`);
         }
       }
 
