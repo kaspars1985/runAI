@@ -163,14 +163,16 @@ final class AppState: ObservableObject {
 
         if !engine.isLoaded {
             AppLogger.warn("startRecording: modelis vēl nav ielādēts")
-            showHUD(text: "Modelis tiek ielādēts…")
+            hudHideWork?.cancel()
+            hud.showError("Modelis tiek ielādēts…")
             scheduleHUDHide(after: 1.5)
             return
         }
         if micPermission == .denied {
             AppLogger.warn("startRecording: mikrofona atļauja nav piešķirta")
             status = .error("Mikrofona atļauja nav piešķirta. Atveriet iestatījumus → Mikrofons.")
-            showHUD(text: status.hudText)
+            hudHideWork?.cancel()
+            hud.showError("Mikrofona atļauja nav piešķirta")
             scheduleHUDHide(after: 2.5)
             return
         }
@@ -179,16 +181,19 @@ final class AppState: ObservableObject {
             recorder.setInputDeviceUID(selectedInputID)
             try recorder.start()
             status = .recording
-            showHUD(text: status.hudText, showLevel: true)
+            hudHideWork?.cancel()
+            hud.showRecording(hotkeyText: hotkey.label)
         } catch let error as AudioRecorderError where error == .noInputDevice {
             AppLogger.error("startRecording neizdevās: nav pievienots neviens mikrofons")
             status = .error("Nav pievienots neviens mikrofons")
-            showHUD(text: status.hudText)
+            hudHideWork?.cancel()
+            hud.showError("Nav pievienots neviens mikrofons")
             scheduleHUDHide(after: 2.5)
         } catch {
             AppLogger.error("startRecording neizdevās: \(error.localizedDescription)")
             status = .error("Mikrofons nav pieejams. Pārbaudiet savienojumu vai iestatījumus.")
-            showHUD(text: status.hudText)
+            hudHideWork?.cancel()
+            hud.showError("Mikrofons nav pieejams")
             scheduleHUDHide(after: 2.5)
         }
     }
@@ -200,7 +205,8 @@ final class AppState: ObservableObject {
         let samples = recorder.takeSamples()
         AppLogger.info("stopRecordingAndTranscribe: samples=\(samples.count)")
         status = .transcribing
-        showHUD(text: status.hudText)
+        hudHideWork?.cancel()
+        hud.showTranscribing()
 
         engine.transcribe(samples, language: language) { [weak self] result in
             guard let self = self else { return }
@@ -230,27 +236,28 @@ final class AppState: ObservableObject {
     }
 
     private func finishTranscription(text: String?, outcome: TextInserter.InsertOutcome = .insertedDirectly, error: String?) {
+        hudHideWork?.cancel()
         if let error = error {
             AppLogger.error("finishTranscription kļūda: \(error)")
             status = .error(error)
-            showHUD(text: error)
+            hud.showError(error)
         } else if let text = text, !text.isEmpty {
             AppLogger.info("finishTranscription: \(text.count) simbolu, iznākums: \(outcome)")
             status = .copied
             let message: String
             switch outcome {
             case .insertedDirectly, .pastedViaShortcut:
-                message = "Ievietots"
+                message = "Teksts ievietots kursorā"
             case .copiedOnly:
                 message = "Nokopēts (⌘V)"
             }
-            showHUD(text: message)
+            hud.showSuccess(message: message, isCopiedOnly: outcome == .copiedOnly)
         } else {
             AppLogger.info("finishTranscription: tukšs rezultāts")
             status = .ready
-            showHUD(text: "Gatavs")
+            hud.showSuccess(message: "Gatavs", isCopiedOnly: false)
         }
-        scheduleHUDHide(after: 1.4)
+        scheduleHUDHide(after: 1.5)
     }
 
     // MARK: - HUD
