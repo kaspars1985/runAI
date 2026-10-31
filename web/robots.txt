@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://runai.ciematnieks.lv/sitemap.xml
