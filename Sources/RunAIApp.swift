@@ -194,7 +194,7 @@ struct MenuBarView: View {
 
             // Darbību rindas
             VStack(spacing: 2) {
-                MenuBarRowButton(title: "Iestatījumi…", icon: "gearshape", colors: colors) {
+                MenuBarRowButton(title: "Iestatījumi", icon: "gearshape", colors: colors) {
                     SettingsWindowController.shared.show()
                 }
                 MenuBarRowButton(title: "Atvērt modeļu mapi", icon: "folder", colors: colors) {
