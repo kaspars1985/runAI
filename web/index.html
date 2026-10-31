@@ -127,6 +127,33 @@
       100% { transform: translateY(0px) rotate(360deg) scale(0.8); }
     }
 
+    /* ===== React Bits style DecryptedText & Wordplay Pill ===== */
+    .wordplay-pill {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .wordplay-pill:hover {
+      transform: translateY(-2px);
+    }
+    .wordplay-pill:active {
+      transform: scale(0.96);
+    }
+    @keyframes pill-pulse-emerald {
+      0%, 100% { box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.25); }
+      50% { box-shadow: 0 0 32px 0px rgba(16, 185, 129, 0.5); }
+    }
+    @keyframes pill-pulse-amber {
+      0%, 100% { box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.25); }
+      50% { box-shadow: 0 0 32px 0px rgba(245, 158, 11, 0.5); }
+    }
+    .wordplay-lv {
+      animation: pill-pulse-emerald 4s ease-in-out infinite;
+    }
+    .wordplay-ltg {
+      animation: pill-pulse-amber 4s ease-in-out infinite 2s;
+    }
+
     /* ===== Animated runAI hero icon (1:1 faithful SVG) ===== */
     .hero-icon-wrap {
       position: relative;
@@ -980,9 +1007,19 @@
     </div>
 
     <!-- Hero Title -->
-    <h1 class="text-4xl sm:text-6xl font-bold tracking-tight text-white mb-6 text-glow leading-[1.1]">
-      Diktē latviski!<br>
-      <span class="text-zinc-400 font-normal">Teksts parādīsies tur, kur ir kursors</span>
+    <h1 class="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 text-glow leading-[1.2]">
+      <span class="inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <span>Diktē</span>
+        <span class="font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-zinc-300">LAT</span><span class="inline-flex items-center gap-2">
+          <span class="wordplay-pill wordplay-lv group relative inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(16,185,129,0.3)] hover:scale-105 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all duration-300 cursor-pointer select-none" data-word="viski" title="Latviešu valoda (noklikšķini, lai izmēģinātu)">
+            <span class="text-emerald-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">viski</span><span class="text-emerald-500/50 font-sans font-light select-none ml-0.5">]</span>
+          </span>
+          <span class="wordplay-pill wordplay-ltg group relative inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono text-2xl sm:text-4xl lg:text-5xl shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)] hover:scale-105 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all duration-300 cursor-pointer select-none" data-word="galiski" title="Latgalīšu volūda (noklikšķini, lai izmēģinātu)">
+            <span class="text-amber-500/50 font-sans font-light select-none mr-0.5">[</span><span class="scramble-target tracking-tight">galiski</span><span class="text-amber-500/50 font-sans font-light select-none ml-0.5">]</span>
+          </span>
+        </span><span>!</span>
+      </span>
+      <span class="text-zinc-400 font-normal text-xl sm:text-3xl lg:text-4xl block mt-4 tracking-normal">Teksts parādīsies tur, kur ir kursors</span>
     </h1>
 
     <!-- Subtitle -->
@@ -1330,10 +1367,18 @@
 
     /* ===== Voice -> Text Morph Showcase Engine ===== */
     (function initVoiceMorphStage() {
-      const PHRASES = [
-        "Šodien ir lieliska diena,",
-        "lai uzsāktu kādu projektu"
-      ];
+      const PHRASE_SETS = {
+        lv: [
+          "Šodien ir lieliska diena,",
+          "lai uzsāktu kādu projektu"
+        ],
+        ltg: [
+          "Loba dīna, kačs pi pīna,",
+          "runoj latgaliski!"
+        ]
+      };
+      let currentDialect = "lv";
+      let PHRASES = PHRASE_SETS[currentDialect];
 
       const PHASE = {
         RECORD: 3200,
@@ -1877,8 +1922,16 @@
       function restartCycle() {
         cycleStart = performance.now();
         particles.length = 0;
+        buildTextLayer();
         measureChars();
       }
+
+      window.setDemoDialect = function(dialect) {
+        if (!PHRASE_SETS[dialect]) return;
+        currentDialect = dialect;
+        PHRASES = PHRASE_SETS[dialect];
+        restartCycle();
+      };
 
       stage.addEventListener("click", restartCycle);
       if (replayBtn) {
@@ -1930,6 +1983,63 @@
       }
 
       requestAnimationFrame(tick);
+    })();
+
+    /* ===== React Bits style DecryptedText Scramble for LAT[viski] [galiski] ===== */
+    (function initDecryptedTextEffect() {
+      const glyphs = "!@#$%^&*~?0123456789abcdefghijklmnopqrstuvwxyz";
+      const pills = document.querySelectorAll(".wordplay-pill");
+
+      pills.forEach(pill => {
+        const targetWord = pill.getAttribute("data-word");
+        const span = pill.querySelector(".scramble-target");
+        if (!span || !targetWord) return;
+
+        let interval = null;
+
+        function scramble() {
+          if (interval) clearInterval(interval);
+          let iteration = 0;
+          const maxIterations = targetWord.length * 3;
+
+          interval = setInterval(() => {
+            span.textContent = targetWord
+              .split("")
+              .map((char, index) => {
+                if (index < iteration / 3) {
+                  return targetWord[index];
+                }
+                return glyphs[Math.floor(Math.random() * glyphs.length)];
+              })
+              .join("");
+
+            if (iteration >= maxIterations) {
+              clearInterval(interval);
+              span.textContent = targetWord;
+            }
+            iteration++;
+          }, 25);
+        }
+
+        pill.addEventListener("mouseenter", scramble);
+        pill.addEventListener("click", () => {
+          scramble();
+          const dialect = pill.classList.contains("wordplay-lv") ? "lv" : "ltg";
+          if (window.setDemoDialect) {
+            window.setDemoDialect(dialect);
+          }
+        });
+      });
+
+      // Periodiska viegla alternējoša atšifrēšanas animācija dīkstāvē
+      let toggle = false;
+      setInterval(() => {
+        const p = document.querySelector(toggle ? ".wordplay-ltg" : ".wordplay-lv");
+        toggle = !toggle;
+        if (p && !p.matches(":hover")) {
+          p.dispatchEvent(new Event("mouseenter"));
+        }
+      }, 6000);
     })();
   </script>
 
