@@ -2,14 +2,14 @@ import Cocoa
 import ApplicationServices
 
 /// Ievieto tekstu aktīvajā lietotnē: vispirms mēģina caur Accessibility API,
-/// pēc tam — starpliktuve + ⌘V.
-/// Teksts VIENMĒR paliek starpliktuvē (clipboard), lai lietotājs jebkurā brīdī varētu nospiest ⌘V.
+/// pēc tam — starpliktuve + ⌘V simulācija.
+/// Teksts VIENMĒR tiek iekopēts arī starpliktuvē (clipboard), lai tas nekad nepazustu.
 final class TextInserter {
 
     enum InsertOutcome {
         case insertedDirectly   // Ievietots caur Accessibility API tieši kursorā
-        case pastedViaShortcut  // Ielīmēts caur ⌘V
-        case copiedOnly         // Nav teksta lauka, atstāts starpliktuvē
+        case pastedViaShortcut  // Ielīmēts caur ⌘V simulāciju
+        case copiedOnly         // Teksts tukšs vai nevarēja ievietot
     }
 
     /// Ievieto tekstu aktīvajā lietotnē un vienmēr saglabā to starpliktuvē.
@@ -22,67 +22,17 @@ final class TextInserter {
         pb.clearContents()
         pb.setString(text, forType: .string)
 
-        // 2. Mēģinām ievietot tieši kursorā caur Accessibility
+        // 2. Mēģinām ievietot tieši kursorā caur Accessibility (lieliski darbojas Cocoa teksta laukos)
         if insertViaAccessibility(text) {
+            AppLogger.info("TextInserter: ievietots tieši caur Accessibility API")
             return .insertedDirectly
         }
 
-        // 3. Pārbaudām, vai aktīvajā logā ir fokusēts elements pirms ⌘V sūtīšanas
-        if hasFocusedUIElement() {
-            sendPasteShortcut()
-            return .pastedViaShortcut
-        } else {
-            AppLogger.info("TextInserter: nav fokusēta teksta lauka, teksts paliek starpliktuvē (gatavs ⌘V)")
-            return .copiedOnly
-        }
-    }
-
-    private func hasFocusedUIElement() -> Bool {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return false }
-        let axApp = AXUIElementCreateApplication(app.processIdentifier)
-        var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focused = focusedValue,
-              CFGetTypeID(focused) == AXUIElementGetTypeID() else {
-            return false
-        }
-        let element = (focused as! AXUIElement)
-        return isEditableTextElement(element)
-    }
-
-    /// A-06: Pārbauda, vai fokusētais elements patiešām ir rediģējams teksta lauks,
-    /// nevis darbvirsma, logs, poga vai Finder mape.
-    private func isEditableTextElement(_ element: AXUIElement) -> Bool {
-        // 1. Pārbaudām lomu (role)
-        var roleValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
-           let role = roleValue as? String {
-            let textRoles: Set<String> = [
-                kAXTextFieldRole as String,
-                kAXTextAreaRole as String,
-                kAXComboBoxRole as String
-            ]
-            if textRoles.contains(role) {
-                return true
-            }
-        }
-
-        // 2. Ja loma nav standarta teksta lauks (piem., tīmekļa skats vai pielāgots redaktors),
-        // pārbaudām, vai kAXValueAttribute ir maināms
-        var isSettable: DarwinBoolean = false
-        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &isSettable) == .success,
-           isSettable.boolValue {
-            return true
-        }
-
-        // 3. Pārbaudām, vai elementam ir aktīvs kursora/atlases diapazons
-        var rangeRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-           rangeRef != nil {
-            return true
-        }
-
-        return false
+        // 3. Ja Accessibility tiešā ievietošana nav pieejama (piem., pārlūki, tīmekļa lapas,
+        // Slack, Electron, redaktori), sūtām ⌘V simulāciju, kas acumirklī ielīmē tekstu
+        AppLogger.info("TextInserter: sūta ⌘V uz aktīvo lietotni")
+        sendPasteShortcut()
+        return .pastedViaShortcut
     }
 
     // MARK: - Accessibility (tieša ievietošana)
@@ -137,6 +87,8 @@ final class TextInserter {
         let down = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true) // "V"
         down?.flags = .maskCommand
         down?.post(tap: .cghidEventTap)
+
+        usleep(15000) // 15ms pauze starp nospiešanu un atlaišanu
 
         let up = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: false)
         up?.flags = .maskCommand

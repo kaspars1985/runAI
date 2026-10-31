@@ -461,7 +461,42 @@ struct SettingsView: View {
                         .foregroundColor(colors.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                // Ievades pārraudzība (nepieciešama macOS 15+)
+                if state.needsInputMonitoring {
+                    Divider().opacity(0.5)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 7) {
+                            Circle()
+                                .fill(state.hasInputMonitoring ? colors.statusGreen : colors.statusRed)
+                                .frame(width: 7, height: 7)
+                            Text("Ievades pārraudzība")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(colors.textPrimary)
+                            Spacer()
+                            if !state.hasInputMonitoring {
+                                Button("Pieprasīt") { state.requestInputMonitoring() }
+                                    .buttonStyle(FlatButtonStyle(colors: colors, prominent: false))
+                                Button("Atvērt iestatījumus") { state.openInputMonitoringSettings() }
+                                    .buttonStyle(FlatButtonStyle(colors: colors, prominent: false))
+                            }
+                        }
+                        Text(inputMonitoringText)
+                            .font(.system(size: 10.5))
+                            .foregroundColor(colors.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
+        }
+    }
+
+    private var inputMonitoringText: String {
+        if state.hasInputMonitoring {
+            return "Atļauja piešķirta. Lietotne var droši uztvert karstos taustiņus fona režīmā."
+        } else {
+            return "Nepieciešama macOS 15 un jaunākās versijās, lai uztvertu karstos taustiņus, kamēr strādājat citās programmās."
         }
     }
 

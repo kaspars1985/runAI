@@ -22,6 +22,12 @@ final class AppState: ObservableObject {
     @Published var hotkey: Hotkey = .default
     @Published var hasAccessibility: Bool = AXIsProcessTrusted()
     @Published var micPermission: MicPermission = .notDetermined
+    @Published var hasInputMonitoring: Bool = {
+        if #available(macOS 15.0, *) {
+            return CGPreflightListenEventAccess()
+        }
+        return true
+    }()
     @Published var downloadedFiles: [String] = []
     @Published var selectedModel: String?
     @Published var isCapturingHotkey: Bool = false
@@ -114,6 +120,7 @@ final class AppState: ObservableObject {
             self?.refreshAccessibility()
             self?.refreshMicPermission()
             self?.refreshInputDevices()
+            self?.refreshInputMonitoring()
         }
 
         // Pirmajā palaišanā pieprasām mikrofona atļauju, lai lietotne parādītos
@@ -448,6 +455,16 @@ final class AppState: ObservableObject {
 
     // MARK: - Atļaujas
 
+    /// Vai šī macOS versija prasa atsevišķu Ievades parraudzības atļauju.
+    /// macOS 15 (Sequoia) un jaunākas prasa to, lai fona lietotne varētu
+    /// uztvert globālos karstos taustiņus citās programmās.
+    var needsInputMonitoring: Bool {
+        if #available(macOS 15.0, *) {
+            return true
+        }
+        return false
+    }
+
     func refreshMicPermission() {
         let newStatus: MicPermission
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -477,6 +494,47 @@ final class AppState: ObservableObject {
         if micPermission == .notDetermined {
             requestMicrophonePermission()
         }
+    }
+
+    /// Atsvaidzina Ievades parraudzības atļaujas stāvokli (tikai macOS 15+).
+    /// Piešķiram @Published tikai ja stāvoklis mainījies, lai izvairītos no
+    /// bezgalīgas SwiftUI pārzīmēšanas.
+    func refreshInputMonitoring() {
+        guard #available(macOS 15.0, *) else { return }
+        let granted = CGPreflightListenEventAccess()
+        if granted != hasInputMonitoring {
+            AppLogger.info("refreshInputMonitoring: stāvoklis mainījās uz \(granted)")
+            hasInputMonitoring = granted
+        }
+    }
+
+    /// Pieprasa Ievades parraudzības atļauju (tikai macOS 15+).
+    func requestInputMonitoring() {
+        guard #available(macOS 15.0, *) else { return }
+        CGRequestListenEventAccess()
+        refreshInputMonitoring()
+    }
+
+    func openInputMonitoringSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Atiestata Ievades parraudzības atļauju lietotnei un pieprasa to no jauna.
+    /// Noderīgi, ja Sistēmas iestatījumos slēdzis jau ir ieslēgts, bet lietotne
+    /// joprojām rāda sarkanu (TCC ieraksts neatbilst pašreizējam binaram).
+    func resetAndPromptInputMonitoring() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        task.arguments = ["reset", "ListenEvent", "lv.runai.app"]
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            // Ja tccutil neizdodas, turpinām — vismaz pieprasīsim atļauju no jauna.
+        }
+        requestInputMonitoring()
     }
 
     /// Atsvaidzina Universālās piekļuves stāvokli un, ja atļauja tikko parādījās,

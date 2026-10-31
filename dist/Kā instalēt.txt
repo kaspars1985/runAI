@@ -2,7 +2,7 @@
 2. Palaidiet runAI. Ja macOS neļauj atvērt:
    Sistēmas iestatījumi → Konfidencialitāte un drošība → «Atvērt tik un tā».
 3. Atļaujiet piekļuvi mikrofonam un pievienojiet runAI sadaļā
-   «Universālā piekļuve» (Accessibility).
+   «Universālā piekļuve» (Accessibility), kā arī uz macOS 15+ sadaļā «Ievades pārraudzība» (Input Monitoring).
 4. Ikonai runAI → «Iestatījumi…» → lejupielādējiet modeli un izvēlieties
    karsto taustiņu.
 
