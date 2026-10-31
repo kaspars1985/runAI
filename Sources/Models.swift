@@ -27,6 +27,27 @@ enum AppStatus: Equatable {
     }
 }
 
+// MARK: - HUD novietojums
+
+enum HUDPosition: String, CaseIterable, Identifiable {
+    case center = "center"
+    case top = "top"
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .center: return "Centrā"
+        case .top: return "Ekrāna augšpusē"
+        }
+    }
+    var iconName: String {
+        switch self {
+        case .center: return "viewfinder"
+        case .top: return "arrow.up.to.line"
+        }
+    }
+}
+
 // MARK: - Modeļa ieraksts
 
 struct ModelEntry: Identifiable, Equatable, Hashable {

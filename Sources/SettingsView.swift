@@ -387,6 +387,23 @@ struct SettingsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+
+                Divider().opacity(0.5)
+
+                // HUD novietojums ekrānā
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("HUD novietojums ekrānā")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(colors.textSecondary)
+
+                    HUDPositionSegmentedControl(
+                        selection: Binding(
+                            get: { state.hudPosition },
+                            set: { state.setHUDPosition($0) }
+                        ),
+                        colors: colors
+                    )
+                }
             }
         }
     }
@@ -629,6 +646,47 @@ private struct ThemeSegmentedControl: View {
                     .background(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(selection == theme ? colors.cardBg : Color.clear)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(colors.keycapBg)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(colors.cardBorder, lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - HUD pozīcijas izvēle
+
+private struct HUDPositionSegmentedControl: View {
+    @Binding var selection: HUDPosition
+    let colors: ThemeColors
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(HUDPosition.allCases) { pos in
+                Button {
+                    selection = pos
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: pos.iconName)
+                            .font(.system(size: 10))
+                        Text(pos.title)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(selection == pos ? colors.textPrimary : colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(selection == pos ? colors.cardBg : Color.clear)
                     )
                 }
                 .buttonStyle(.plain)

@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
     @Published var appTheme: AppTheme = .system
     @Published var autoCheckUpdates: Bool = true
     @Published var blurBackdrop: Bool = true
+    @Published var hudPosition: HUDPosition = .center
 
     let modelManager = ModelManager()
     let updateChecker = UpdateChecker()
@@ -91,6 +92,12 @@ final class AppState: ObservableObject {
         } else {
             blurBackdrop = true
         }
+        if let rawPos = UserDefaults.standard.string(forKey: "hudPosition"),
+           let pos = HUDPosition(rawValue: rawPos) {
+            hudPosition = pos
+        } else {
+            hudPosition = .center
+        }
 
         // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
         if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
@@ -116,6 +123,7 @@ final class AppState: ObservableObject {
         // Piemēro izvēlēto izskata tēmu
         NSApp.appearance = appTheme.nsAppearance
         hud.blurBackdropEnabled = blurBackdrop
+        hud.positionPreference = hudPosition
 
         refreshInputDevices()
         refreshModels()
@@ -405,6 +413,12 @@ final class AppState: ObservableObject {
         blurBackdrop = enabled
         UserDefaults.standard.set(enabled, forKey: "blurBackdrop")
         hud.blurBackdropEnabled = enabled
+    }
+
+    func setHUDPosition(_ pos: HUDPosition) {
+        hudPosition = pos
+        UserDefaults.standard.set(pos.rawValue, forKey: "hudPosition")
+        hud.positionPreference = pos
     }
 
     func setHotkey(_ h: Hotkey) {

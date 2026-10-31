@@ -5,6 +5,7 @@ import QuartzCore
 /// Rāda ierakstīšanas, atšifrēšanas un pabeigšanas stāvokļus.
 final class HUDController {
     var blurBackdropEnabled: Bool = true
+    var positionPreference: HUDPosition = .center
 
     private let panel: NSPanel
     private let hudView = HUDView()
@@ -203,7 +204,13 @@ final class HUDController {
         let visible = s.visibleFrame
         let size = NSSize(width: HUDView.containerWidth, height: HUDView.containerHeight)
         let x = visible.midX - size.width / 2
-        let y = visible.maxY - size.height - 30
+        let y: CGFloat
+        switch positionPreference {
+        case .center:
+            y = visible.midY - size.height / 2
+        case .top:
+            y = visible.maxY - size.height - 30
+        }
         panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
     }
 }
