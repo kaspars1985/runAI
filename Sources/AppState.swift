@@ -219,6 +219,19 @@ final class AppState: ObservableObject {
         recorder.stop()
         let samples = recorder.takeSamples()
         AppLogger.info("stopRecordingAndTranscribe: samples=\(samples.count)")
+
+        if samples.isEmpty {
+            AppLogger.error("stopRecordingAndTranscribe: mikrofons nenodeva datus (samples=0)")
+            finishTranscription(text: nil, error: "Mikrofons nenodeva skaņu (0 paraugi)")
+            return
+        }
+
+        if samples.count < 4800 {
+            AppLogger.warn("stopRecordingAndTranscribe: audio pārāk īss (<300ms, samples=\(samples.count))")
+            finishTranscription(text: nil, error: "Pārāk īss ieraksts")
+            return
+        }
+
         status = .transcribing
         hudHideWork?.cancel()
         hud.showTranscribing()

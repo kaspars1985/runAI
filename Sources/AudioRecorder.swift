@@ -72,17 +72,10 @@ final class AudioRecorder {
 
     private func startEngine(applyDeviceUID: Bool) throws {
         let requestedUID = applyDeviceUID ? currentDeviceUID : nil
-        // A-03: Ātrā palaišana — ja engine jau eksistē un konfigurācija nav mainījusies,
-        // nav nepieciešams veidot jaunu AVAudioEngine, kas patērē ~200ms un apēd pirmo vārdu.
-        if let existing = self.engine,
-           isTapped,
-           lastConfiguredDeviceUID == requestedUID {
-            existing.prepare()
-            try existing.start()
-            return
-        }
 
-        // Vispirms sakopjam iepriekšējo engine, ja tāds bija aktīvs
+        // Vienmēr sakopjam iepriekšējo engine — pat ja konfigurācija šķietami nav mainījusies.
+        // Bluetooth ierīču atvienošanās, miega režīms un frekvenču maiņa (48kHz A2DP ↔ 24/16kHz HFP)
+        // padara veco AVAudioEngine instanci nederīgu, un tā rezultātā tiek ierakstīti 0 paraugi.
         if let oldEng = self.engine {
             if isTapped {
                 oldEng.inputNode.removeTap(onBus: 0)
@@ -91,10 +84,12 @@ final class AudioRecorder {
             if oldEng.isRunning {
                 oldEng.stop()
             }
+            oldEng.reset()
             self.engine = nil
         }
+        converter = nil
 
-        // Jauna AVAudioEngine instance
+        // Jauna AVAudioEngine instance — inputNode iegūst aktuālo aparatūras formātu un aktīvo maršrutu.
         let eng = AVAudioEngine()
         self.engine = eng
         self.lastConfiguredDeviceUID = requestedUID
@@ -112,9 +107,8 @@ final class AudioRecorder {
                                                       UInt32(MemoryLayout<AudioDeviceID>.size))
                     if status != noErr {
                         AppLogger.warn("AudioRecorder.startEngine: AudioUnitSetProperty neizdevās (status=\(status))")
-                    } else {
-                        eng.reset()
                     }
+                    // SVARĪGI: neizsaucam eng.reset() — tas atiestata tikko konfigurēto audio unit.
                 }
             }
         }
@@ -150,7 +144,16 @@ final class AudioRecorder {
     }
 
     private func handleConfigurationChange() {
-        guard isRunning else { return }
+        if !isRunning {
+            // Ieraksts nav aktīvs — pilnībā atbrīvojam engine, lai nepaliktu nederīga instance.
+            AppLogger.info("AudioRecorder: AVAudioEngineConfigurationChange (nav aktīva ieraksta) — atbrīvo engine")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, !self.isRunning else { return }
+                self.tearDownEngine()
+            }
+            return
+        }
+
         AppLogger.info("AudioRecorder: AVAudioEngineConfigurationChange — pārstartē engine")
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.isRunning else { return }
@@ -170,15 +173,17 @@ final class AudioRecorder {
     }
 
     func stop() {
-        if let eng = engine, eng.isRunning {
-            eng.pause()
-        }
+        // SVARĪGI: neizmantojam eng.pause(). Apturēts (paused) AVAudioEngine saglabā novecojušu
+        // instanci, kas sabrūk, kad Bluetooth ierīces atvienojas, notiek miega režīms vai mainās
+        // paraugu frekvence (48kHz A2DP ↔ 24/16kHz HFP) — nākamajā ierakstā tiek iegūti 0 paraugi.
+        // Tā vietā engine pilnībā apturam un atbrīvojam.
+        tearDownEngine()
         isRunning = false
         AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
-    /// Pilnībā atbrīvo audio resursus (piem., lietotni aizverot).
-    func tearDown() {
+    /// Pilnībā aptur un atbrīvo engine (tap, stop, reset, nil).
+    private func tearDownEngine() {
         if let observer = configObserver {
             NotificationCenter.default.removeObserver(observer)
             configObserver = nil
@@ -191,9 +196,16 @@ final class AudioRecorder {
             if eng.isRunning {
                 eng.stop()
             }
+            eng.reset()
         }
         engine = nil
+        converter = nil
         lastConfiguredDeviceUID = nil
+    }
+
+    /// Pilnībā atbrīvo audio resursus (piem., lietotni aizverot).
+    func tearDown() {
+        tearDownEngine()
         isRunning = false
     }
 
@@ -212,10 +224,21 @@ final class AudioRecorder {
     }
 
     private func process(_ buffer: AVAudioPCMBuffer) {
+        guard buffer.frameLength > 0, buffer.format.sampleRate > 0 else { return }
+
+        // Ja formāts jau ir mērķa formāts, nav nepieciešama konvertēšana.
+        if buffer.format.sampleRate == targetFormat.sampleRate,
+           buffer.format.channelCount == targetFormat.channelCount,
+           buffer.format.commonFormat == targetFormat.commonFormat {
+            appendSamples(from: buffer)
+            return
+        }
+
         if converter == nil || converter?.inputFormat != buffer.format {
             converter = AVAudioConverter(from: buffer.format, to: targetFormat)
         }
-        guard let converter = converter, buffer.format.sampleRate > 0 else { return }
+        guard let converter = converter else { return }
+
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
         guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: outCapacity) else { return }
@@ -233,8 +256,18 @@ final class AudioRecorder {
         }
         converter.convert(to: out, error: &convError, withInputFrom: inputBlock)
 
-        guard let channelData = out.floatChannelData else { return }
-        let n = Int(out.frameLength)
+        if let convError = convError {
+            AppLogger.warn("AudioRecorder.process: konvertēšana neizdevās: \(convError.localizedDescription)")
+            return
+        }
+        guard out.frameLength > 0 else { return }
+        appendSamples(from: out)
+    }
+
+    /// Nolasa paraugus no PCM bufera, aprēķina līmeni un pievieno uzkrātajiem paraugiem.
+    private func appendSamples(from buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData else { return }
+        let n = Int(buffer.frameLength)
         guard n > 0 else { return }
 
         let ptr = channelData[0]
