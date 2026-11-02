@@ -169,12 +169,16 @@ final class HotkeyMonitor {
                 AppLogger.info("HotkeyMonitor: hotkey press (mouse button \(button))")
                 DispatchQueue.main.async { [weak self] in self?.onPress?() }
             }
+            // Apēdam notikumu, lai mērķa lietotne nesaņem klikšķi.
+            return true
         case .otherMouseUp:
             if isDown {
                 isDown = false
                 AppLogger.info("HotkeyMonitor: hotkey release (mouse button \(button))")
                 DispatchQueue.main.async { [weak self] in self?.onRelease?() }
             }
+            // Apēdam notikumu, lai mērķa lietotne nesaņem klikšķi.
+            return true
         default:
             break
         }
@@ -223,12 +227,14 @@ final class HotkeyMonitor {
 
         switch type {
         case .keyDown:
-            if keyCode == hotkey.keyCode && !autorepeat && hotkey.matches(keyCode: keyCode, flags: event.flags) {
-                if !isDown {
+            if keyCode == hotkey.keyCode && hotkey.matches(keyCode: keyCode, flags: event.flags) {
+                if !autorepeat && !isDown {
                     isDown = true
                     AppLogger.info("HotkeyMonitor: hotkey press (keyCode=\(keyCode))")
                     DispatchQueue.main.async { [weak self] in self?.onPress?() }
                 }
+                // Apēdam notikumu (arī autorepeat), lai priekšplāna lietotne nesaņem taustiņu.
+                return true
             }
         case .keyUp:
             if keyCode == hotkey.keyCode {
@@ -237,6 +243,8 @@ final class HotkeyMonitor {
                     AppLogger.info("HotkeyMonitor: hotkey release (keyCode=\(keyCode))")
                     DispatchQueue.main.async { [weak self] in self?.onRelease?() }
                 }
+                // Apēdam notikumu, lai priekšplāna lietotne nesaņem taustiņa atlaišanu.
+                return true
             }
         default:
             break

@@ -111,3 +111,79 @@ enum AudioDevices {
         return uid?.takeRetainedValue() as String?
     }
 }
+
+/// Uzrauga CoreAudio sistēmas līmeņa notikumus (ierīču pievienošana/atvienošana
+/// un noklusētās ievades ierīces maiņa) un paziņo par tiem uz galvenā pavediena.
+final class AudioDeviceMonitor {
+
+    /// Izsaukts uz `DispatchQueue.main`, kad mainās audio ierīču saraksts
+    /// vai noklusētā ievades ierīce.
+    private let onChange: () -> Void
+
+    private var isRunning = false
+
+    private var devicesListener: AudioObjectPropertyListenerBlock?
+    private var defaultInputListener: AudioObjectPropertyListenerBlock?
+
+    private var devicesAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDevices,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+
+    private var defaultInputAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultInputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+
+    init(onChange: @escaping () -> Void) {
+        self.onChange = onChange
+    }
+
+    deinit {
+        stop()
+    }
+
+    /// Sāk uzraudzīt CoreAudio notikumus. Vairākkārtīgs izsaukums ir drošs.
+    func start() {
+        guard !isRunning else { return }
+        isRunning = true
+
+        let system = AudioObjectID(kAudioObjectSystemObject)
+
+        let devicesBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.onChange()
+            }
+        }
+        let defaultInputBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.onChange()
+            }
+        }
+
+        devicesListener = devicesBlock
+        defaultInputListener = defaultInputBlock
+
+        AudioObjectAddPropertyListenerBlock(system, &devicesAddress, DispatchQueue.main, devicesBlock)
+        AudioObjectAddPropertyListenerBlock(system, &defaultInputAddress, DispatchQueue.main, defaultInputBlock)
+    }
+
+    /// Pārtrauc uzraudzību un noņem CoreAudio listenerus.
+    func stop() {
+        guard isRunning else { return }
+        isRunning = false
+
+        let system = AudioObjectID(kAudioObjectSystemObject)
+
+        if let block = devicesListener {
+            AudioObjectRemovePropertyListenerBlock(system, &devicesAddress, DispatchQueue.main, block)
+            devicesListener = nil
+        }
+        if let block = defaultInputListener {
+            AudioObjectRemovePropertyListenerBlock(system, &defaultInputAddress, DispatchQueue.main, block)
+            defaultInputListener = nil
+        }
+    }
+}

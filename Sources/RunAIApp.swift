@@ -3,6 +3,7 @@ import AppKit
 
 // MARK: - Iestatījumu logs
 
+@MainActor
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
     private var window: NSWindow?

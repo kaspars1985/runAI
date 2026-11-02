@@ -26,15 +26,31 @@ LU MII Mākslīgā intelekta laboratorija (AiLab) ir uztrenējusi tiešām labus
 
 ## Uzstādīšana
 
+### 1. variants: ar vienu komandu (ieteicams)
+
+Terminālī izpildi:
+```bash
+curl -fsSL https://runai.ciematnieks.lv/install.sh | bash
+```
+Skripts automātiski lejupielādēs jaunāko versiju, ievietos to mapē `Applications`, nokonfigurēs drošības atļaujas un palaidīs lietotni — bez jebkādiem Gatekeeper bloķēšanas logiem.
+
+### 2. variants: manuāli ar .dmg
+
 1. Lejupielādē jaunāko `runAI.dmg` no [Releases](https://github.com/kaspars1985/runAI/releases) vai [runai.ciematnieks.lv](https://runai.ciematnieks.lv).
 2. Atver `.dmg` un ievelc `runAI` mapē `Applications`.
-3. Tā kā lietotne nav parakstīta ar maksas Apple Developer kontu, pirmajā reizē macOS rādīs brīdinājumu. Atver *System Settings -> Privacy & Security* un nospied *Open Anyway*, vai terminālī izpildi:
-   ```bash
-   xattr -cr /Applications/runAI.app
-   ```
+3. Tā kā lietotne nav parakstīta ar maksas Apple Developer kontu, pirmajā reizē macOS var rādīt brīdinājumu:
+   - Iespied ar labo peles pogu (vai `Control` + klikšķis) uz `runAI.app` mapē `Applications` un izvēlies **Open** → **Open**, VAI
+   - Terminālī izpildi:
+     ```bash
+     xattr -cr /Applications/runAI.app
+     ```
 4. Augšējā izvēlnes joslā (menu bar) nospied uz runAI ikonas un atver **Iestatījumi**:
    - Sadaļā **Atļaujas** piešķir prasītās piekļuves.
    - Sadaļā **Modeļi** lejupielādē modeli savai ikdienas valodai.
+
+### Atjauninājumi
+
+Lietotnē ir iebūvēts automātiskais atjauninātājs. Kad iznāk jauna versija, iestatījumu logā vai izvēlnē parādīsies poga **Atjaunināt tūlīt**, kas ar vienu klikšķi lejupielādē, uzstāda un pārstartē runAI.
 
 Ja pēc lietotnes atjaunināšanas macOS joprojām rāda, ka *Accessibility* atļauja ir ieslēgta, bet teksts automātiski neievietojas, iestatījumu logā nospied **Atiestatīt atļauju** un ieslēdz to no jauna (macOS mēdz saglabāt vecās versijas kontrolsummu).
 
@@ -87,6 +103,16 @@ Frameworks/
 
 ## Izmaiņu vēsture
 
+- **v3.0.0** – liels arhitektūras atjauninājums:
+  - CoreAudio C notikumu klausītāji (`AudioDeviceMonitor`) nomaina 2s dīkstāves aptaujas taimeri (0% CPU dīkstāvē).
+  - Trīspakāpju pret-halucināciju aizsardzība (`AudioGuard`): RMS balss aktivitātes logs (VAD), Whisper dekodera trokšņu apspiešana un vārdu atkārtošanās ciklu sabrukšana.
+  - Automātiskā atjaunināšana lietotnē (`UpdateChecker`) un 1-rindas termināļa instalators bez Apple Developer ID prasības.
+  - Drošs 10 minūšu ieraksta limits ar automātisku transkripciju, novēršot audio zaudēšanu.
+  - Asinhrona `tccutil` izpilde bez galvenā pavediena bloķēšanas.
+  - Atsevišķi moduļi `PreferencesManager` un `PermissionsManager` ar `@MainActor` pavedienu drošību.
+  - Iebūvēts 34 testu vienībtestu ietvars ar automātisku pārbaudi pirms DMG veidošanas.
+  - Minimizēts mājaslapas CSS (19 KB) un `vercel.json` drošības galvenes.
+- **v2.4.3** – automātiska atjauninājumu pārbaude un DMG lejupielāde no GitHub Releases.
 - **v2.4.2** – pievienots latgaliešu valodas modelis `AiLab Large v3 Latgalian (q8)` un latgaliešu valodas izvēle iestatījumos.
 - **v2.4.1** – izvēlnes joslā rāda pašreiz aktīvo mikrofonu; īsāki HUD statusa paziņojumi.
 - **v2.4.0** – iespēja novietot HUD indikatoru ekrāna centrā vai augšpusē.

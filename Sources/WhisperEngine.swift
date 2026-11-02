@@ -20,11 +20,25 @@ final class WhisperEngine: @unchecked Sendable {
     private let queue = DispatchQueue(label: "lv.runai.whisper", qos: .userInitiated)
     private(set) var loadedPath: String?
 
+    /// Aizsargā _isLoaded, lai isLoaded varētu atgriezties acumirklī bez bloķēšanas.
+    private var unfairLock = os_unfair_lock_s()
+    private var _isLoaded: Bool = false
+
     var isLoaded: Bool {
-        queue.sync { ctx != nil }
+        os_unfair_lock_lock(&unfairLock)
+        let value = _isLoaded
+        os_unfair_lock_unlock(&unfairLock)
+        return value
+    }
+
+    private func setLoaded(_ value: Bool) {
+        os_unfair_lock_lock(&unfairLock)
+        _isLoaded = value
+        os_unfair_lock_unlock(&unfairLock)
     }
 
     func load(path: String) throws {
+        setLoaded(false)
         try queue.sync {
             if let old = ctx {
                 whisper_free(old)
@@ -34,10 +48,12 @@ final class WhisperEngine: @unchecked Sendable {
             cparams.use_gpu = true
             guard let c = whisper_init_from_file_with_params(path, cparams) else {
                 loadedPath = nil
+                setLoaded(false)
                 throw WhisperError.loadFailed
             }
             ctx = c
             loadedPath = path
+            setLoaded(true)
         }
     }
 
@@ -48,6 +64,7 @@ final class WhisperEngine: @unchecked Sendable {
                 ctx = nil
             }
             loadedPath = nil
+            setLoaded(false)
         }
     }
 
@@ -60,7 +77,7 @@ final class WhisperEngine: @unchecked Sendable {
             }
             // A-08: Nometam audio, kas ir īsāks par 300 ms (4800 paraugi pie 16 kHz),
             // lai novērstu Whisper halucinācijas pie nejaušiem īsiem taustiņa klikšķiem.
-            guard samples.count >= 4800 else {
+            guard AudioGuard.isLongEnough(samples) else {
                 DispatchQueue.main.async { completion(.success("")) }
                 return
             }
@@ -75,9 +92,19 @@ final class WhisperEngine: @unchecked Sendable {
             // A-02: Atļaujam vairāku teikumu diktēšanu bez apraušanas pie pauzēm.
             params.single_segment = false
             params.translate = false
+            // Anti-halucināciju parametri (2. slānis):
+            // - suppress_blank: nepieļauj tukšus segmentus
+            // - suppress_nst: nepieļauj "non-speech tokens" (troksni, mūziku)
+            // - no_speech_thold: augstāks slieksnis klusuma atzīšanai
+            // - entropy_thold: ierobežo haotiskus/zema pārliecības segmentus
+            params.suppress_blank = true
+            params.suppress_nst = true
+            params.no_speech_thold = 0.6
+            params.entropy_thold = 2.4
 
             let forced = language != "auto"
             var resultText = ""
+            var fullResult: Int32 = 0
 
             if forced {
                 // Latgaliešu modelis izmanto "lv" valodas marķieri Whisper modelī
@@ -86,15 +113,19 @@ final class WhisperEngine: @unchecked Sendable {
                     params.language = langPtr
                     params.detect_language = false
                     samples.withUnsafeBufferPointer { buf in
-                        _ = whisper_full(ctx, params, buf.baseAddress, Int32(buf.count))
+                        fullResult = whisper_full(ctx, params, buf.baseAddress, Int32(buf.count))
                     }
                 }
             } else {
                 params.language = nil
                 params.detect_language = true
                 samples.withUnsafeBufferPointer { buf in
-                    _ = whisper_full(ctx, params, buf.baseAddress, Int32(buf.count))
+                    fullResult = whisper_full(ctx, params, buf.baseAddress, Int32(buf.count))
                 }
+            }
+
+            if fullResult != 0 {
+                AppLogger.warn("WhisperEngine: whisper_full atgrieza kodu \(fullResult)")
             }
 
             let n = whisper_full_n_segments(ctx)

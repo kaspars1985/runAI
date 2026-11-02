@@ -9,38 +9,48 @@ enum MicPermission: Equatable {
     case notDetermined, authorized, denied
 }
 
+/// Galvenais lietotnes stāvokļa koordinators (@MainActor).
+/// Savieno lietotāja saskarni (SwiftUI) ar audio dzinēju, whisper.cpp,
+/// globālo taustiņu monitoru, atļaujām un iestatījumiem.
+@MainActor
 final class AppState: ObservableObject {
 
     static let shared = AppState()
 
-    // MARK: - Publicētais stāvoklis
+    // MARK: - Pārvaldnieki
 
-    @Published var status: AppStatus = .needsModel
-    @Published var inputDevices: [AudioDevice] = []
-    @Published var selectedInputID: String?
-    @Published var language: String = "lv"
-    @Published var hotkey: Hotkey = .default
-    @Published var hasAccessibility: Bool = AXIsProcessTrusted()
-    @Published var micPermission: MicPermission = .notDetermined
-    @Published var hasInputMonitoring: Bool = {
-        if #available(macOS 15.0, *) {
-            return CGPreflightListenEventAccess()
-        }
-        return true
-    }()
-    @Published var downloadedFiles: [String] = []
-    @Published var selectedModel: String?
-    @Published var isCapturingHotkey: Bool = false
-    @Published var menuBarIconStyle: MenuBarIconStyle = .waveform
-    @Published var appTheme: AppTheme = .system
-    @Published var autoCheckUpdates: Bool = true
-    @Published var blurBackdrop: Bool = true
-    @Published var hudPosition: HUDPosition = .center
-
+    let prefs = PreferencesManager()
+    let perms = PermissionsManager()
     let modelManager = ModelManager()
     let updateChecker = UpdateChecker()
 
-    // MARK: - Komponentes
+    // MARK: - Publiskais stāvoklis
+
+    @Published var status: AppStatus = .needsModel
+    @Published var inputDevices: [AudioDevice] = []
+    @Published var downloadedFiles: [String] = []
+    @Published var isCapturingHotkey: Bool = false
+
+    // MARK: - Fasādes īpašības (Preferences)
+
+    var language: String { prefs.language }
+    var hotkey: Hotkey { prefs.hotkey }
+    var selectedInputID: String? { prefs.selectedInputID }
+    var selectedModel: String? { prefs.selectedModel }
+    var menuBarIconStyle: MenuBarIconStyle { prefs.menuBarIconStyle }
+    var appTheme: AppTheme { prefs.appTheme }
+    var autoCheckUpdates: Bool { prefs.autoCheckUpdates }
+    var blurBackdrop: Bool { prefs.blurBackdrop }
+    var hudPosition: HUDPosition { prefs.hudPosition }
+
+    // MARK: - Fasādes īpašības (Atļaujas)
+
+    var hasAccessibility: Bool { perms.hasAccessibility }
+    var micPermission: MicPermission { perms.micPermission }
+    var hasInputMonitoring: Bool { perms.hasInputMonitoring }
+    var needsInputMonitoring: Bool { perms.needsInputMonitoring }
+
+    // MARK: - Iekšējās komponentes
 
     private let recorder = AudioRecorder()
     private let engine = WhisperEngine()
@@ -48,62 +58,12 @@ final class AppState: ObservableObject {
     private let hud = HUDController()
     private var monitor: HotkeyMonitor!
     private var hudHideWork: DispatchWorkItem?
-    private var permissionTimer: Timer?
+    private var deviceMonitor: AudioDeviceMonitor?
     private var didSetup = false
 
-    private init() {
-        // Ielādē saglabātos iestatījumus
-        if let data = UserDefaults.standard.data(forKey: "hotkey"),
-           let h = try? JSONDecoder().decode(Hotkey.self, from: data) {
-            hotkey = h
-        }
-        if let lang = UserDefaults.standard.string(forKey: "language"), !lang.isEmpty {
-            language = lang
-        }
-        if let mid = UserDefaults.standard.string(forKey: "selectedInput"),
-           !mid.isEmpty,
-           !mid.contains("CADefaultDeviceAggregate"),
-           mid != "0" {
-            selectedInputID = mid
-        }
-        if let m = UserDefaults.standard.string(forKey: "selectedModel") {
-            selectedModel = m
-        }
-        if let styleStr = UserDefaults.standard.string(forKey: "menuBarIconStyle"),
-           let style = MenuBarIconStyle(rawValue: styleStr) {
-            menuBarIconStyle = style
-        } else {
-            menuBarIconStyle = .waveform
-            UserDefaults.standard.set(MenuBarIconStyle.waveform.rawValue, forKey: "menuBarIconStyle")
-        }
-        if let themeStr = UserDefaults.standard.string(forKey: "appTheme"),
-           let theme = AppTheme(rawValue: themeStr) {
-            appTheme = theme
-        } else {
-            appTheme = .system
-        }
-        if UserDefaults.standard.object(forKey: "autoCheckUpdates") != nil {
-            autoCheckUpdates = UserDefaults.standard.bool(forKey: "autoCheckUpdates")
-        } else {
-            autoCheckUpdates = true
-        }
-        if UserDefaults.standard.object(forKey: "blurBackdrop") != nil {
-            blurBackdrop = UserDefaults.standard.bool(forKey: "blurBackdrop")
-        } else {
-            blurBackdrop = true
-        }
-        if let rawPos = UserDefaults.standard.string(forKey: "hudPosition"),
-           let pos = HUDPosition(rawValue: rawPos) {
-            hudPosition = pos
-        } else {
-            hudPosition = .center
-        }
+    private init() {}
 
-        // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
-        if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
-            selectedInputID = AudioDevices.defaultInputUID()
-        }
-    }
+    // MARK: - Inicializācija un iestatīšana
 
     func setup() {
         guard !didSetup else { return }
@@ -113,46 +73,70 @@ final class AppState: ObservableObject {
         AppLogger.info("=== runAI palaists ===")
 
         Paths.ensureDirs()
-        monitor = HotkeyMonitor(hotkey: hotkey)
+        monitor = HotkeyMonitor(hotkey: prefs.hotkey)
 
-        monitor.onPress = { [weak self] in self?.startRecording() }
-        monitor.onRelease = { [weak self] in self?.stopRecordingAndTranscribe() }
-        monitor.onCancel = { [weak self] in self?.cancelRecording() }
-        recorder.onLevel = { [weak self] level in self?.hud.updateLevel(level) }
+        monitor.onPress = { [weak self] in
+            Task { @MainActor in self?.startRecording() }
+        }
+        monitor.onRelease = { [weak self] in
+            Task { @MainActor in self?.stopRecordingAndTranscribe() }
+        }
+        monitor.onCancel = { [weak self] in
+            Task { @MainActor in self?.cancelRecording() }
+        }
+        recorder.onLevel = { [weak self] level in
+            self?.hud.updateLevel(level)
+        }
 
-        // Piemēro izvēlēto izskata tēmu
-        NSApp.appearance = appTheme.nsAppearance
-        hud.blurBackdropEnabled = blurBackdrop
-        hud.positionPreference = hudPosition
+        // Tēma un HUD iestatījumi
+        NSApp.appearance = prefs.appTheme.nsAppearance
+        hud.blurBackdropEnabled = prefs.blurBackdrop
+        hud.positionPreference = prefs.hudPosition
 
         refreshInputDevices()
         refreshModels()
-        refreshMicPermission()
+        perms.refreshMicPermission()
         monitor.start()
 
-        // Atļauju un audio ierīču stāvokļa atsvaidzināšana
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.refreshAccessibility()
-            self?.refreshMicPermission()
+        // Kad Accessibility tikko piešķirts, pārstartējam HotkeyMonitor
+        perms.onAccessibilityGranted = { [weak self] in
+            guard let self = self, let monitor = self.monitor, !monitor.isRunning else { return }
+            AppLogger.info("AppState: Accessibility piešķirta — pārstartē HotkeyMonitor")
+            monitor.start()
+        }
+        perms.startMonitoring()
+
+        // Audio ierīču CoreAudio notikumu monitors (0% CPU dīkstāvē)
+        let devMon = AudioDeviceMonitor { [weak self] in
             self?.refreshInputDevices()
-            self?.refreshInputMonitoring()
+        }
+        devMon.start()
+        self.deviceMonitor = devMon
+
+        // 10 minūšu limita sasniegšana — automātiska transkripcija
+        recorder.onMaxDurationReached = { [weak self] in
+            guard let self = self, self.status == .recording else { return }
+            AppLogger.warn("AudioRecorder: sasniegts 10 minūšu limits — automātiski aptur un transkribē")
+            self.stopRecordingAndTranscribe()
         }
 
-        // Pirmajā palaišanā pieprasām mikrofona atļauju, lai lietotne parādītos
-        // «Mikrofons» sarakstā sistēmas iestatījumos.
+        // Auto pieprasījums mikrofonam pirmajā reizē
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.autoRequestMicrophoneIfNeeded()
+            self?.perms.autoRequestMicrophoneIfNeeded()
         }
 
-        // A-10: Pārbauda atjauninājumus fonā tikai tad, ja tas ir iespējots
-        if autoCheckUpdates {
+        // Auto atjauninājumu pārbaude
+        updateChecker.onRelaunch = { [weak self] in
+            self?.quitApp()
+        }
+        if prefs.autoCheckUpdates {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
                 self?.updateChecker.checkForUpdates(manual: false)
             }
         }
 
-        // Ielādē izvēlēto modeli fonā
-        if let sel = selectedModel, downloadedFiles.contains(sel) {
+        // Ielādē modeli fonā
+        if let sel = prefs.selectedModel, downloadedFiles.contains(sel) {
             loadModel(sel)
         } else {
             status = .needsModel
@@ -183,7 +167,7 @@ final class AppState: ObservableObject {
             scheduleHUDHide(after: 1.5)
             return
         }
-        if micPermission == .denied {
+        if perms.micPermission == .denied {
             AppLogger.warn("startRecording: mikrofona atļauja nav piešķirta")
             status = .error("Mikrofona atļauja nav piešķirta. Atveriet iestatījumus → Mikrofons.")
             hudHideWork?.cancel()
@@ -192,12 +176,12 @@ final class AppState: ObservableObject {
             return
         }
         do {
-            AppLogger.info("startRecording: sāk ierakstu (device=\(selectedInputID ?? "default"))")
-            recorder.setInputDeviceUID(selectedInputID)
+            AppLogger.info("startRecording: sāk ierakstu (device=\(prefs.selectedInputID ?? "default"))")
+            recorder.setInputDeviceUID(prefs.selectedInputID)
             try recorder.start()
             status = .recording
             hudHideWork?.cancel()
-            hud.showRecording(hotkeyText: hotkey.label)
+            hud.showRecording(hotkeyText: prefs.hotkey.label)
         } catch let error as AudioRecorderError where error == .noInputDevice {
             AppLogger.error("startRecording neizdevās: nav pievienots neviens mikrofons")
             status = .error("Nav pievienots neviens mikrofons")
@@ -226,9 +210,16 @@ final class AppState: ObservableObject {
             return
         }
 
-        if samples.count < 4800 {
+        guard AudioGuard.isLongEnough(samples) else {
             AppLogger.warn("stopRecordingAndTranscribe: audio pārāk īss (<300ms, samples=\(samples.count))")
             finishTranscription(text: nil, error: "Pārāk īss ieraksts")
+            return
+        }
+
+        // Anti-halucinācijas (1. slānis): pārbaudām, vai audio satur runu, nevis tikai fona klusumu
+        if !AudioGuard.hasSpeech(samples) {
+            AppLogger.info("stopRecordingAndTranscribe: audio ir klusums (nav konstatēta balss)")
+            finishTranscription(text: nil, error: "Netika konstatēta balss")
             return
         }
 
@@ -236,28 +227,31 @@ final class AppState: ObservableObject {
         hudHideWork?.cancel()
         hud.showTranscribing()
 
-        engine.transcribe(samples, language: language) { [weak self] result in
+        engine.transcribe(samples, language: prefs.language) { [weak self] result in
             guard let self = self else { return }
-            switch result {
-            case .success(let text):
-                if text.isEmpty {
-                    self.finishTranscription(text: nil, error: "Nekas netika atpazīts")
-                } else {
-                    let outcome = self.inserter.insert(text)
-                    self.finishTranscription(text: text, outcome: outcome, error: nil)
+            Task { @MainActor in
+                switch result {
+                case .success(let rawText):
+                    // Anti-halucinācijas (3. slānis): tīrām subtitru klišejas un vārdu atkārtošanās cilpas
+                    let text = AudioGuard.cleanTranscription(rawText)
+                    if text.isEmpty {
+                        self.finishTranscription(text: nil, error: "Nekas netika atpazīts")
+                    } else {
+                        let outcome = self.inserter.insert(text)
+                        self.finishTranscription(text: text, outcome: outcome, error: nil)
+                    }
+                case .failure(let err):
+                    self.finishTranscription(text: nil, error: err.localizedDescription)
                 }
-            case .failure(let err):
-                self.finishTranscription(text: nil, error: err.localizedDescription)
             }
         }
     }
 
-    /// A-05: Atceļ aktīvo ierakstu (piemēram, ja lietotājs turot Option nospieda citu taustiņu)
     func cancelRecording() {
         guard recorder.isRunning else { return }
         AppLogger.info("cancelRecording: ieraksts atcelts")
         recorder.stop()
-        _ = recorder.takeSamples() // Nometam paraugus
+        _ = recorder.takeSamples()
         hudHideWork?.cancel()
         hud.hide()
         status = engine.isLoaded ? .ready : .needsModel
@@ -288,19 +282,14 @@ final class AppState: ObservableObject {
         scheduleHUDHide(after: 1.5)
     }
 
-    // MARK: - HUD
-
-    private func showHUD(text: String, showLevel: Bool = false) {
-        hudHideWork?.cancel()
-        hud.show(text: text, showLevel: showLevel)
-    }
-
     private func scheduleHUDHide(after delay: TimeInterval) {
         hudHideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            self?.hud.hide()
-            if let self = self, self.status != .recording && self.status != .transcribing {
-                self.status = self.engine.isLoaded ? .ready : .needsModel
+            Task { @MainActor in
+                self?.hud.hide()
+                if let self = self, self.status != .recording && self.status != .transcribing {
+                    self.status = self.engine.isLoaded ? .ready : .needsModel
+                }
             }
         }
         hudHideWork = work
@@ -329,17 +318,18 @@ final class AppState: ObservableObject {
         AppLogger.info("loadModel: sāk ielādēt \(fileName)")
         status = .loading
         let engine = self.engine
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
                 try engine.load(path: path)
-                DispatchQueue.main.async {
+                Task { @MainActor in
+                    guard let self = self else { return }
                     AppLogger.info("loadModel: ielādēts \(fileName)")
-                    self.selectedModel = fileName
-                    UserDefaults.standard.set(fileName, forKey: "selectedModel")
+                    self.prefs.setSelectedModel(fileName)
                     self.status = .ready
                 }
             } catch {
-                DispatchQueue.main.async {
+                Task { @MainActor in
+                    guard let self = self else { return }
                     AppLogger.error("loadModel neizdevās \(fileName): \(error.localizedDescription)")
                     self.status = .error("Neizdevās ielādēt modeli")
                 }
@@ -348,17 +338,15 @@ final class AppState: ObservableObject {
     }
 
     func selectModel(_ fileName: String) {
-        selectedModel = fileName
-        UserDefaults.standard.set(fileName, forKey: "selectedModel")
+        prefs.setSelectedModel(fileName)
         loadModel(fileName)
     }
 
     func deleteModel(_ fileName: String) {
         modelManager.delete(fileName)
         refreshModels()
-        if selectedModel == fileName {
-            selectedModel = nil
-            UserDefaults.standard.removeObject(forKey: "selectedModel")
+        if prefs.selectedModel == fileName {
+            prefs.setSelectedModel(nil)
             engine.unload()
             status = .needsModel
         }
@@ -398,58 +386,34 @@ final class AppState: ObservableObject {
         AppLogger.revealLogFile()
     }
 
-    // MARK: - Iestatījumi
+    // MARK: - Preferences fasādes
 
-    func setLanguage(_ code: String) {
-        language = code
-        UserDefaults.standard.set(code, forKey: "language")
-    }
-
-    func setMenuBarIconStyle(_ style: MenuBarIconStyle) {
-        menuBarIconStyle = style
-        UserDefaults.standard.set(style.rawValue, forKey: "menuBarIconStyle")
-    }
-
-    func setAppTheme(_ theme: AppTheme) {
-        UserDefaults.standard.set(theme.rawValue, forKey: "appTheme")
-        appTheme = theme
-        NSApp.appearance = theme.nsAppearance
-        SettingsWindowController.shared.updateAppearance(theme.nsAppearance)
-    }
-
-    func setAutoCheckUpdates(_ enabled: Bool) {
-        autoCheckUpdates = enabled
-        UserDefaults.standard.set(enabled, forKey: "autoCheckUpdates")
-    }
-
+    func setLanguage(_ code: String) { prefs.setLanguage(code) }
+    func setMenuBarIconStyle(_ style: MenuBarIconStyle) { prefs.setMenuBarIconStyle(style) }
+    func setAppTheme(_ theme: AppTheme) { prefs.setAppTheme(theme) }
+    func setAutoCheckUpdates(_ enabled: Bool) { prefs.setAutoCheckUpdates(enabled) }
     func setBlurBackdrop(_ enabled: Bool) {
-        blurBackdrop = enabled
-        UserDefaults.standard.set(enabled, forKey: "blurBackdrop")
+        prefs.setBlurBackdrop(enabled)
         hud.blurBackdropEnabled = enabled
     }
-
     func setHUDPosition(_ pos: HUDPosition) {
-        hudPosition = pos
-        UserDefaults.standard.set(pos.rawValue, forKey: "hudPosition")
+        prefs.setHUDPosition(pos)
         hud.positionPreference = pos
     }
-
     func setHotkey(_ h: Hotkey) {
-        AppLogger.info("setHotkey: \(h.label)")
-        hotkey = h
+        prefs.setHotkey(h)
         monitor.update(hotkey: h)
-        if let data = try? JSONEncoder().encode(h) {
-            UserDefaults.standard.set(data, forKey: "hotkey")
-        }
     }
 
     func beginHotkeyCapture() {
         isCapturingHotkey = true
         monitor.onCaptured = { [weak self] h in
-            guard let self = self else { return }
-            self.isCapturingHotkey = false
-            if let h = h {
-                self.setHotkey(h)
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.isCapturingHotkey = false
+                if let h = h {
+                    self.setHotkey(h)
+                }
             }
         }
         monitor.beginCapture()
@@ -462,10 +426,7 @@ final class AppState: ObservableObject {
 
     func setInputDevice(_ uid: String) {
         guard !uid.isEmpty else { return }
-        if selectedInputID != uid {
-            selectedInputID = uid
-        }
-        UserDefaults.standard.set(uid, forKey: "selectedInput")
+        prefs.setSelectedInput(uid)
     }
 
     func refreshInputDevices() {
@@ -478,173 +439,44 @@ final class AppState: ObservableObject {
         let savedUID = UserDefaults.standard.string(forKey: "selectedInput")
 
         let targetUID: String?
-        if let sel = selectedInputID, !sel.isEmpty, newDevices.contains(where: { $0.id == sel }) {
-            // Pašreiz izvēlētā ierīce joprojām ir pieslēgta
+        if let sel = prefs.selectedInputID, !sel.isEmpty, newDevices.contains(where: { $0.id == sel }) {
             targetUID = sel
         } else if let saved = savedUID, !saved.isEmpty, newDevices.contains(where: { $0.id == saved }) {
-            // Iepriekš saglabātā ierīce (piem., AirPods) tikko atkal pieslēdzās
             targetUID = saved
         } else if let def = defaultUID, newDevices.contains(where: { $0.id == def }) {
-            // Izmantojam sistēmas noklusēto ievades ierīci (piem., tikko ielikti AirPods)
             targetUID = def
         } else {
-            // Pirmā pieejamā ierīce vai nil, ja nav neviena mikrofona
             targetUID = newDevices.first?.id
         }
 
-        if selectedInputID != targetUID {
-            selectedInputID = targetUID
-            if let valid = targetUID, !valid.isEmpty {
-                UserDefaults.standard.set(valid, forKey: "selectedInput")
-            }
+        if prefs.selectedInputID != targetUID {
+            prefs.setSelectedInput(targetUID)
         }
     }
 
-    // MARK: - Atļaujas
+    // MARK: - Permissions fasādes
 
-    /// Vai šī macOS versija prasa atsevišķu Ievades parraudzības atļauju.
-    /// macOS 15 (Sequoia) un jaunākas prasa to, lai fona lietotne varētu
-    /// uztvert globālos karstos taustiņus citās programmās.
-    var needsInputMonitoring: Bool {
-        if #available(macOS 15.0, *) {
-            return true
-        }
-        return false
-    }
+    func refreshMicPermission() { perms.refreshMicPermission() }
+    func requestMicrophonePermission() { perms.requestMicrophonePermission() }
+    func openMicrophoneSettings() { perms.openMicrophoneSettings() }
 
-    func refreshMicPermission() {
-        let newStatus: MicPermission
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: newStatus = .authorized
-        case .denied, .restricted: newStatus = .denied
-        case .notDetermined: newStatus = .notDetermined
-        @unknown default: newStatus = .notDetermined
-        }
-        // SVARĪGI: piešķiram tikai ja stāvoklis mainījies. Iepriekš @Published tika
-        // piešķirts katras 2 sekundes, izraisot objectWillChange un bezgalīgu
-        // SwiftUI pārzīmēšanu.
-        if micPermission != newStatus {
-            micPermission = newStatus
-        }
-    }
+    func refreshInputMonitoring() { perms.refreshInputMonitoring() }
+    func requestInputMonitoring() { perms.requestInputMonitoring() }
+    func openInputMonitoringSettings() { perms.openInputMonitoringSettings() }
+    func resetAndPromptInputMonitoring() { perms.resetAndPromptInputMonitoring() }
 
-    func requestMicrophonePermission() {
-        AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.refreshMicPermission()
-            }
-        }
-    }
-
-    private func autoRequestMicrophoneIfNeeded() {
-        refreshMicPermission()
-        if micPermission == .notDetermined {
-            requestMicrophonePermission()
-        }
-    }
-
-    /// Atsvaidzina Ievades parraudzības atļaujas stāvokli (tikai macOS 15+).
-    /// Piešķiram @Published tikai ja stāvoklis mainījies, lai izvairītos no
-    /// bezgalīgas SwiftUI pārzīmēšanas.
-    func refreshInputMonitoring() {
-        guard #available(macOS 15.0, *) else { return }
-        let granted = CGPreflightListenEventAccess()
-        if granted != hasInputMonitoring {
-            AppLogger.info("refreshInputMonitoring: stāvoklis mainījās uz \(granted)")
-            hasInputMonitoring = granted
-        }
-    }
-
-    /// Pieprasa Ievades parraudzības atļauju (tikai macOS 15+).
-    func requestInputMonitoring() {
-        guard #available(macOS 15.0, *) else { return }
-        CGRequestListenEventAccess()
-        refreshInputMonitoring()
-    }
-
-    func openInputMonitoringSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    /// Atiestata Ievades parraudzības atļauju lietotnei un pieprasa to no jauna.
-    /// Noderīgi, ja Sistēmas iestatījumos slēdzis jau ir ieslēgts, bet lietotne
-    /// joprojām rāda sarkanu (TCC ieraksts neatbilst pašreizējam binaram).
-    func resetAndPromptInputMonitoring() {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-        task.arguments = ["reset", "ListenEvent", "lv.runai.app"]
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            // Ja tccutil neizdodas, turpinām — vismaz pieprasīsim atļauju no jauna.
-        }
-        requestInputMonitoring()
-    }
-
-    /// Atsvaidzina Universālās piekļuves stāvokli un, ja atļauja tikko parādījās,
-    /// pārstartē HotkeyMonitor (jo sākotnējais start() varēja neizdoties, ja atļauja
-    /// vēl nebija piešķirta — CGEvent.tapCreate atgriež nil).
-    private func refreshAccessibility() {
-        let trusted = AXIsProcessTrusted()
-        if trusted != hasAccessibility {
-            AppLogger.info("refreshAccessibility: stāvoklis mainījās uz \(trusted)")
-            hasAccessibility = trusted
-        }
-        if trusted, let monitor = monitor, !monitor.isRunning {
-            AppLogger.info("refreshAccessibility: atļauja piešķirta, pārstartē HotkeyMonitor")
-            monitor.start()
-        }
-    }
-
-    func promptAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        hasAccessibility = AXIsProcessTrustedWithOptions(options)
-        if hasAccessibility, let monitor = monitor, !monitor.isRunning {
-            monitor.start()
-        }
-    }
-
-    /// Atiestata Universālās piekļuves atļauju lietotnei un pieprasa to no jauna.
-    /// Noderīgi, ja Sistēmas iestatījumos slēdzis jau ir ieslēgts, bet lietotne
-    /// joprojām rāda sarkanu (TCC ieraksts neatbilst pašreizējam binaram).
-    func resetAndPromptAccessibility() {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-        task.arguments = ["reset", "Accessibility", "lv.runai.app"]
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            // Ja tccutil neizdodas, turpinām — vismaz pieprasīsim atļauju no jauna.
-        }
-        hasAccessibility = AXIsProcessTrusted()
-        promptAccessibility()
-    }
-
-    func openAccessibilitySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    func openMicrophoneSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-            NSWorkspace.shared.open(url)
-        }
-    }
+    func refreshAccessibility() { perms.refreshAccessibility() }
+    func promptAccessibility() { perms.promptAccessibility() }
+    func resetAndPromptAccessibility() { perms.resetAndPromptAccessibility() }
+    func openAccessibilitySettings() { perms.openAccessibilitySettings() }
 
     // MARK: - Iziet
 
-    /// Kārtīgi aptur visas komponentes un iziet no lietotnes.
-    /// Izsaucam exit(0) tieši, lai ggml_metal_device_free neabortētu uz neatbrīvotiem
-    /// Metal resursiem NSApplicationWillTerminate laikā.
     func quitApp() {
         AppLogger.info("Lietotne tiek aizvērta (Quit)")
-        permissionTimer?.invalidate()
-        permissionTimer = nil
+        perms.stopMonitoring()
+        deviceMonitor?.stop()
+        deviceMonitor = nil
         monitor?.stop()
         recorder.tearDown()
         engine.unload()
@@ -656,7 +488,7 @@ final class AppState: ObservableObject {
     // MARK: - Palīgi
 
     var selectedModelTitle: String {
-        if let m = selectedModel {
+        if let m = prefs.selectedModel {
             if let entry = ModelEntry.catalog.first(where: { $0.fileName == m }) {
                 return entry.title
             }
@@ -669,7 +501,7 @@ final class AppState: ObservableObject {
         if inputDevices.isEmpty {
             return "Nav mikrofona"
         }
-        if let id = selectedInputID, let dev = inputDevices.first(where: { $0.id == id }) {
+        if let id = prefs.selectedInputID, let dev = inputDevices.first(where: { $0.id == id }) {
             return dev.name
         }
         if let def = AudioDevices.defaultInputUID(), let dev = inputDevices.first(where: { $0.id == def }) {

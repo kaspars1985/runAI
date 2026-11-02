@@ -4,6 +4,9 @@ cd "$(dirname "$0")"
 
 ./build.sh
 
+echo "==> Pārbauda testus pirms DMG veidošanas…"
+./test.sh
+
 echo "==> Veido runAI.dmg…"
 rm -rf dist/dmg_staging
 mkdir -p dist/dmg_staging

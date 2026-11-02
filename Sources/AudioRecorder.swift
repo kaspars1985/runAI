@@ -28,10 +28,13 @@ final class AudioRecorder {
     private var lastConfiguredDeviceUID: String?
     private var configObserver: NSObjectProtocol?
     private let maxSamples = 16000 * 60 * 10 // 10 minūtes @ 16 kHz mono (A-03: aizsardzība pret atmiņas noplūdi)
+    private var maxDurationNotified = false
 
     private(set) var samples: [Float] = []
     /// Mikrofona līmenis (0…1), tiek izsaukts galvenajā pavedienā.
     var onLevel: ((Float) -> Void)?
+    /// Izsaukts galvenajā pavedienā, kad sasniegts maksimālais ieraksta ilgums.
+    var onMaxDurationReached: (() -> Void)?
 
     /// Seko līdzi, vai ieraksts ir aktīvs. Tiek uzturēts atsevišķi no engine.isRunning,
     /// jo CoreAudio var īslaicīgi atiestatīt engine Bluetooth frekvenču maiņas laikā.
@@ -54,6 +57,7 @@ final class AudioRecorder {
             samples.removeAll(keepingCapacity: true)
         }
         converter = nil
+        maxDurationNotified = false
         isRunning = true
 
         do {
@@ -122,6 +126,17 @@ final class AudioRecorder {
             throw AudioRecorderError.invalidFormat
         }
 
+        // SVARĪGI: konfigurējam konvertētāju PIRMS tap uzstādīšanas, lai izvairītos no
+        // datu sacensības starp CoreAudio realtime pavedienu un galveno pavedienu.
+        // Pēc tap uzstādīšanas `self.converter` vairs netiek modificēts no process().
+        if outFormat.sampleRate == targetFormat.sampleRate,
+           outFormat.channelCount == targetFormat.channelCount,
+           outFormat.commonFormat == targetFormat.commonFormat {
+            self.converter = nil
+        } else {
+            self.converter = AVAudioConverter(from: outFormat, to: targetFormat)
+        }
+
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.process(buffer)
         }
@@ -179,6 +194,7 @@ final class AudioRecorder {
         // Tā vietā engine pilnībā apturam un atbrīvojam.
         tearDownEngine()
         isRunning = false
+        maxDurationNotified = false
         AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
@@ -188,6 +204,8 @@ final class AudioRecorder {
             NotificationCenter.default.removeObserver(observer)
             configObserver = nil
         }
+        // SVARĪGI: tap noņemam PIRMS converter atbrīvošanas, lai realtime pavediens
+        // vairs neizsauktu process() ar novecojušu konvertētāju.
         if let eng = engine {
             if isTapped {
                 eng.inputNode.removeTap(onBus: 0)
@@ -234,10 +252,10 @@ final class AudioRecorder {
             return
         }
 
-        if converter == nil || converter?.inputFormat != buffer.format {
-            converter = AVAudioConverter(from: buffer.format, to: targetFormat)
-        }
-        guard let converter = converter else { return }
+        // SVARĪGI: lasām konvertētāju lokāli, NEMODIFICĒJOT self.converter — tas tika
+        // konfigurēts startEngine() laikā pirms tap uzstādīšanas. Modificēšana šeit
+        // radītu datu sacensību ar galveno pavedienu.
+        guard let conv = self.converter else { return }
 
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
@@ -254,7 +272,7 @@ final class AudioRecorder {
             outStatus.pointee = .haveData
             return buffer
         }
-        converter.convert(to: out, error: &convError, withInputFrom: inputBlock)
+        conv.convert(to: out, error: &convError, withInputFrom: inputBlock)
 
         if let convError = convError {
             AppLogger.warn("AudioRecorder.process: konvertēšana neizdevās: \(convError.localizedDescription)")
@@ -284,6 +302,12 @@ final class AudioRecorder {
             guard let self = self else { return }
             if self.samples.count < self.maxSamples {
                 self.samples.append(contentsOf: copy)
+            }
+            if self.samples.count >= self.maxSamples, self.isRunning, !self.maxDurationNotified {
+                self.maxDurationNotified = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.onMaxDurationReached?()
+                }
             }
         }
         DispatchQueue.main.async { [weak self] in

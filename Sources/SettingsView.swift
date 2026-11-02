@@ -174,7 +174,21 @@ struct SettingsView: View {
 
     private var updateStatusView: some View {
         HStack(spacing: 8) {
-            if updates.updateAvailable {
+            if updates.isUpdating {
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(updates.updateStage)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(colors.textPrimary)
+                    if updates.updateProgress > 0 && updates.updateProgress < 1.0 {
+                        Text("\(Int(updates.updateProgress * 100))%")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(colors.textMuted)
+                    }
+                }
+                ProgressView()
+                    .scaleEffect(0.65)
+                    .frame(width: 28, height: 22)
+            } else if updates.updateAvailable {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text("Pieejama v\(updates.latestVersion ?? "")")
                         .font(.system(size: 11, weight: .medium))
@@ -183,8 +197,14 @@ struct SettingsView: View {
                         .font(.system(size: 10))
                         .foregroundColor(colors.textMuted)
                 }
-                Button("Lejupielādēt") { updates.openReleasePage() }
-                    .buttonStyle(FlatButtonStyle(colors: colors, prominent: true))
+                HStack(spacing: 6) {
+                    if updates.downloadAssetURL != nil {
+                        Button("Atjaunināt tūlīt") { updates.downloadAndInstallUpdate() }
+                            .buttonStyle(FlatButtonStyle(colors: colors, prominent: true))
+                    }
+                    Button("Relīzes lapa") { updates.openReleasePage() }
+                        .buttonStyle(FlatButtonStyle(colors: colors, prominent: updates.downloadAssetURL == nil))
+                }
             } else {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text("v\(updates.currentVersion)")
