@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 
 /// Lejupielādē whisper modeļus no Hugging Face un glabā tos Models mapē.
+@MainActor
 final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published private(set) var progress: [String: Double] = [:]   // fileName -> 0…1
     @Published private(set) var activeDownloads: Set<String> = []
@@ -23,26 +24,22 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
         }
         let task = session.downloadTask(with: entry.url)
         task.taskDescription = entry.fileName
-        DispatchQueue.main.async {
-            self.downloadError = nil
-            self.progress[entry.fileName] = 0
-            self.activeDownloads.insert(entry.fileName)
-            self.completions[entry.fileName] = completion
-            self.tasks[entry.fileName] = task
-        }
+        self.downloadError = nil
+        self.progress[entry.fileName] = 0
+        self.activeDownloads.insert(entry.fileName)
+        self.completions[entry.fileName] = completion
+        self.tasks[entry.fileName] = task
         task.resume()
     }
 
     /// Atceļ aktīvo lejupielādi un paziņo par kļūdu.
     func cancel(_ fileName: String) {
-        DispatchQueue.main.async {
-            let task = self.tasks[fileName]
-            task?.cancel()
-            let error = NSError(domain: "runAI.ModelManager", code: -999,
-                                userInfo: [NSLocalizedDescriptionKey: "Lejupielāde atcelta"])
-            if self.completions[fileName] != nil {
-                self.finish(name: fileName, result: .failure(error))
-            }
+        let task = self.tasks[fileName]
+        task?.cancel()
+        let error = NSError(domain: "runAI.ModelManager", code: -999,
+                            userInfo: [NSLocalizedDescriptionKey: "Lejupielāde atcelta"])
+        if self.completions[fileName] != nil {
+            self.finish(name: fileName, result: .failure(error))
         }
     }
 
@@ -58,20 +55,20 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
 
     // MARK: - URLSessionDownloadDelegate
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
-                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
-                    totalBytesExpectedToWrite: Int64) {
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                                didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+                                totalBytesExpectedToWrite: Int64) {
         guard let name = downloadTask.taskDescription else { return }
         let fraction = totalBytesExpectedToWrite > 0
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.progress[name] = fraction
         }
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
-                    didFinishDownloadingTo location: URL) {
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                                didFinishDownloadingTo location: URL) {
         guard let name = downloadTask.taskDescription else { return }
         let dest = Paths.modelsDir.appendingPathComponent(name)
 
@@ -80,7 +77,7 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
            !(200...299).contains(http.statusCode) {
             let error = NSError(domain: "runAI.ModelManager", code: http.statusCode,
                                 userInfo: [NSLocalizedDescriptionKey: "Servera kļūda (HTTP \(http.statusCode))"])
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.finish(name: name, result: .failure(error))
             }
             return
@@ -91,34 +88,34 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
         if size < 1_000_000 {
             let error = NSError(domain: "runAI.ModelManager", code: -2,
                                 userInfo: [NSLocalizedDescriptionKey: "Lejupielādētais fails ir nepilnīgs vai bojāts"])
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.finish(name: name, result: .failure(error))
             }
             return
         }
 
         // SVARĪGI: pagaidu fails tiek dzēsts, kad šī delegate metode atgriežas,
-        // tāpēc faila pārvietošana jāveic SINHRONI (nevis DispatchQueue.main.async).
+        // tāpēc faila pārvietošana jāveic SINHRONI (nevis asinhroni).
         do {
             if FileManager.default.fileExists(atPath: dest.path) {
                 try FileManager.default.removeItem(at: dest)
             }
             try FileManager.default.moveItem(at: location, to: dest)
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.finish(name: name, result: .success(dest))
             }
         } catch {
             // Notīrām daļēji izveidoto failu, ja tāds palicis.
             try? FileManager.default.removeItem(at: dest)
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.finish(name: name, result: .failure(error))
             }
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let name = task.taskDescription, let error = error else { return }
-        DispatchQueue.main.async {
+        Task { @MainActor in
             if self.completions[name] != nil {
                 self.finish(name: name, result: .failure(error))
             }

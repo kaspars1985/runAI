@@ -150,11 +150,12 @@ final class PermissionsManager: ObservableObject {
 
     func refreshAccessibility() {
         let trusted = AXIsProcessTrusted()
+        let wasTrusted = hasAccessibility
         if trusted != hasAccessibility {
             AppLogger.info("refreshAccessibility: stāvoklis mainījās uz \(trusted)")
             hasAccessibility = trusted
         }
-        if trusted {
+        if !wasTrusted && trusted {
             onAccessibilityGranted?()
         }
     }

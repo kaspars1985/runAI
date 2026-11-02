@@ -103,6 +103,12 @@ Frameworks/
 
 ## Izmaiņu vēsture
 
+- **v3.0.1** – drošības un stabilitātes uzlabojumi:
+  - Automātiskā atjauninātāja DMG pakotnes bundle ID pārbaude (`validateSourceApp`).
+  - Droša resursu tīrīšana (`trap`) instalācijas skriptā `install.sh`.
+  - HSTS un striktas CSP drošības galvenes vietnē `vercel.json`.
+  - `ModelManager` piesaiste `@MainActor` pavedienu drošībai.
+  - Novērsti lieki `onAccessibilityGranted` izsaukumi pie lietotnes fokusa.
 - **v3.0.0** – liels arhitektūras atjauninājums:
   - CoreAudio C notikumu klausītāji (`AudioDeviceMonitor`) nomaina 2s dīkstāves aptaujas taimeri (0% CPU dīkstāvē).
   - Trīspakāpju pret-halucināciju aizsardzība (`AudioGuard`): RMS balss aktivitātes logs (VAD), Whisper dekodera trokšņu apspiešana un vārdu atkārtošanās ciklu sabrukšana.

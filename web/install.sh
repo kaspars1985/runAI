@@ -5,6 +5,19 @@
 
 set -euo pipefail
 
+TMP_DMG=""
+MOUNT_POINT=""
+
+cleanup() {
+  if [ -n "$MOUNT_POINT" ] && [ -d "$MOUNT_POINT" ]; then
+    hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1 || true
+  fi
+  if [ -n "$TMP_DMG" ] && [ -f "$TMP_DMG" ]; then
+    rm -f "$TMP_DMG"
+  fi
+}
+trap cleanup EXIT INT TERM
+
 echo ""
 echo "  ⚡ runAI automātiskā uzstādīšana"
 echo "  ==============================="

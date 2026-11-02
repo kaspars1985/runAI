@@ -231,6 +231,9 @@ final class UpdateChecker: ObservableObject {
             // 2. Atrodam .app montētajā sējumā.
             let sourceApp = try findApp(in: mountPoint)
 
+            // 2a. Pārbaudām, vai avota lietotne ir derīga runAI lietotne pirms aizstāšanas.
+            try validateSourceApp(sourceApp)
+
             // 3. Mērķa lietotnes ceļš.
             let targetApp = targetAppURL()
 
@@ -298,6 +301,27 @@ final class UpdateChecker: ObservableObject {
             }
         }
         throw InstallError(message: "Neizdevās noteikt DMG montēšanas punktu.")
+    }
+
+    /// Pārbauda, vai avota .app satur derīgu Info.plist ar CFBundleIdentifier "lv.runai.app".
+    private func validateSourceApp(_ sourceApp: URL) throws {
+        let infoPlist = sourceApp
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Info.plist")
+
+        guard FileManager.default.fileExists(atPath: infoPlist.path) else {
+            throw InstallError(message: "Atjauninājuma pakotnē nav atrasts Info.plist — instalēšana pārtraukta drošības nolūkos.")
+        }
+
+        guard let data = try? Data(contentsOf: infoPlist),
+              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+              let bundleId = plist["CFBundleIdentifier"] as? String else {
+            throw InstallError(message: "Neizdevās nolasīt atjauninājuma Info.plist — instalēšana pārtraukta drošības nolūkos.")
+        }
+
+        guard bundleId == "lv.runai.app" else {
+            throw InstallError(message: "Atjauninājuma pakotnes identifikators nav \"lv.runai.app\" (atrasts: \"\(bundleId)\") — instalēšana pārtraukta drošības nolūkos.")
+        }
     }
 
     /// Atrod .app pakotni montētajā sējumā.
