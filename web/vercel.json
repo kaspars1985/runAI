@@ -11,7 +11,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.github.com; font-src 'self'; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.github.com; font-src 'self'; frame-ancestors 'none';"
         },
         {
           "key": "X-Frame-Options",
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "source": "/styles.css",
+      "source": "/(styles\\.css|custom\\.css|app\\.js)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -41,11 +41,11 @@
       ]
     },
     {
-      "source": "/(favicon.png|icon.png|blog_cover.jpg)",
+      "source": "/(favicon\\.png|blog_cover\\.jpg)",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=604800, immutable"
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     },
