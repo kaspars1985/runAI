@@ -12,8 +12,14 @@ cleanup() {
   if [ -n "$MOUNT_POINT" ] && [ -d "$MOUNT_POINT" ]; then
     hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1 || true
   fi
+  MOUNT_POINT=""
   if [ -n "$TMP_DMG" ] && [ -f "$TMP_DMG" ]; then
     rm -f "$TMP_DMG"
+  fi
+  TMP_DMG=""
+  # Notīra pagaidu .new mapi, ja tā palikusi pēc neveiksmīgas uzstādīšanas.
+  if [ -e "/Applications/runAI.app.new" ]; then
+    rm -rf "/Applications/runAI.app.new" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT INT TERM
@@ -38,14 +44,46 @@ fi
 # 2. Iegūst jaunāko relīzi no GitHub
 echo "==> Meklē jaunāko runAI versiju GitHub..."
 LATEST_JSON=$(curl -fsSL "https://api.github.com/repos/kaspars1985/runAI/releases/latest")
-DMG_URL=$(echo "$LATEST_JSON" | grep -o 'https://[^"]*runAI\.dmg' | head -1)
 
-if [ -z "$DMG_URL" ]; then
+# Uzticami parsē JSON ar Python: izvelk tag_name un DMG lejupielādes URL.
+PARSED=$(printf '%s' "$LATEST_JSON" | /usr/bin/python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+tag = data.get("tag_name") or ""
+assets = data.get("assets") or []
+preferred = None
+fallback = None
+for a in assets:
+    name = (a.get("name") or "")
+    url = (a.get("browser_download_url") or "")
+    if not url.startswith("https://"):
+        continue
+    lower = name.lower()
+    if lower == "runai.dmg" and preferred is None:
+        preferred = url
+    elif lower.endswith(".dmg") and fallback is None:
+        fallback = url
+url = preferred or fallback
+if not tag or not url:
+    sys.exit(1)
+print(tag)
+print(url)
+') || {
+  echo "❌ Kļūda: Neizdevās atrast runAI.dmg failu jaunākajā GitHub relīzē."
+  exit 1
+}
+
+TAG_NAME=$(printf '%s\n' "$PARSED" | sed -n '1p')
+DMG_URL=$(printf '%s\n' "$PARSED" | sed -n '2p')
+
+if [ -z "$TAG_NAME" ] || [ -z "$DMG_URL" ]; then
   echo "❌ Kļūda: Neizdevās atrast runAI.dmg failu jaunākajā GitHub relīzē."
   exit 1
 fi
 
-TAG_NAME=$(echo "$LATEST_JSON" | grep '"tag_name":' | head -1 | cut -d '"' -f 4)
 echo "    Atrasta versija: $TAG_NAME"
 
 # 3. Lejupielādē DMG uz pagaidu mapi
@@ -67,19 +105,47 @@ MOUNT_POINT=$(echo "$MOUNT_OUT" | awk -F '\t' '{print $NF}' | grep -E '^/Volumes
 
 if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT" ]; then
   echo "❌ Kļūda: Neizdevās piemontēt DMG sējumu."
-  rm -f "$TMP_DMG"
   exit 1
 fi
 
-# 6. Kopē lietotni uz /Applications
+if [ ! -d "$MOUNT_POINT/runAI.app" ]; then
+  echo "❌ Kļūda: DMG sējumā nav atrasta runAI.app lietotne."
+  exit 1
+fi
+
+# 6. Droša lietotnes nomaiņa /Applications mapē
 echo "==> Uzstāda /Applications/runAI.app..."
-rm -rf /Applications/runAI.app
-cp -R "$MOUNT_POINT/runAI.app" /Applications/
+NEW_APP="/Applications/runAI.app.new"
+OLD_APP="/Applications/runAI.app.old"
+TARGET_APP="/Applications/runAI.app"
+
+# Notīra iepriekšējo nepabeigto .new mapi.
+rm -rf "$NEW_APP"
+
+# Kopē jauno lietotni uz pagaidu .new.
+cp -R "$MOUNT_POINT/runAI.app" "$NEW_APP"
+
+# Pārvieto esošo lietotni uz .old, ja tā eksistē.
+if [ -e "$TARGET_APP" ]; then
+  rm -rf "$OLD_APP"
+  mv "$TARGET_APP" "$OLD_APP"
+fi
+
+# Pārvieto .new uz galīgo vietu; ja neizdodas — atjauno .old.
+if ! mv "$NEW_APP" "$TARGET_APP"; then
+  echo "❌ Kļūda: Neizdevās uzstādīt runAI.app. Atjauno iepriekšējo versiju..."
+  if [ -e "$OLD_APP" ]; then
+    mv "$OLD_APP" "$TARGET_APP" || true
+  fi
+  exit 1
+fi
+
+# Notīra veco rezerves kopiju.
+rm -rf "$OLD_APP"
 
 # 7. Atmontē DMG un sakopj
 echo "==> Sakopj pagaidu failus..."
-hdiutil detach "$MOUNT_POINT" -force >/dev/null 2>&1 || true
-rm -f "$TMP_DMG"
+cleanup
 
 # 8. Noņem macOS Gatekeeper karantīnu
 echo "==> Konfigurē drošības atļaujas (xattr -cr)..."

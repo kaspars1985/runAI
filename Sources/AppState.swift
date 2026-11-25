@@ -60,6 +60,8 @@ final class AppState: ObservableObject {
     private var hudHideWork: DispatchWorkItem?
     private var deviceMonitor: AudioDeviceMonitor?
     private var didSetup = false
+    private var cancellables = Set<AnyCancellable>()
+    private var loadGeneration: UInt64 = 0
 
     private init() {}
 
@@ -97,6 +99,17 @@ final class AppState: ObservableObject {
         refreshModels()
         perms.refreshMicPermission()
         monitor.start()
+
+        // Pārsūtām pārvaldnieku izmaiņas uz AppState, lai SwiftUI atjaunotos.
+        prefs.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        perms.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        updateChecker.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
 
         // Kad Accessibility tikko piešķirts, pārstartējam HotkeyMonitor
         perms.onAccessibilityGranted = { [weak self] in
@@ -144,14 +157,6 @@ final class AppState: ObservableObject {
     }
 
     // MARK: - Ierakstīšana
-
-    func toggleRecording() {
-        if status == .recording {
-            stopRecordingAndTranscribe()
-        } else if status != .transcribing {
-            startRecording()
-        }
-    }
 
     func startRecording() {
         guard !isCapturingHotkey else { return }
@@ -273,11 +278,11 @@ final class AppState: ObservableObject {
             case .copiedOnly:
                 message = "Nokopēts (⌘V)"
             }
-            hud.showSuccess(message: message, isCopiedOnly: outcome == .copiedOnly)
+            hud.showSuccess(message: message)
         } else {
             AppLogger.info("finishTranscription: tukšs rezultāts")
             status = .ready
-            hud.showSuccess(message: "Gatavs", isCopiedOnly: false)
+            hud.showSuccess(message: "Gatavs")
         }
         scheduleHUDHide(after: 1.5)
     }
@@ -315,22 +320,20 @@ final class AppState: ObservableObject {
             status = .needsModel
             return
         }
+        loadGeneration &+= 1
+        let gen = loadGeneration
         AppLogger.info("loadModel: sāk ielādēt \(fileName)")
         status = .loading
-        let engine = self.engine
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                try engine.load(path: path)
-                Task { @MainActor in
-                    guard let self = self else { return }
+        engine.load(path: path) { [weak self] result in
+            Task { @MainActor in
+                guard let self = self, self.loadGeneration == gen else { return }
+                switch result {
+                case .success:
                     AppLogger.info("loadModel: ielādēts \(fileName)")
                     self.prefs.setSelectedModel(fileName)
                     self.status = .ready
-                }
-            } catch {
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    AppLogger.error("loadModel neizdevās \(fileName): \(error.localizedDescription)")
+                case .failure(let err):
+                    AppLogger.error("loadModel neizdevās \(fileName): \(err.localizedDescription)")
                     self.status = .error("Neizdevās ielādēt modeli")
                 }
             }
@@ -346,6 +349,7 @@ final class AppState: ObservableObject {
         modelManager.delete(fileName)
         refreshModels()
         if prefs.selectedModel == fileName {
+            loadGeneration &+= 1
             prefs.setSelectedModel(nil)
             engine.unload()
             status = .needsModel
@@ -366,15 +370,42 @@ final class AppState: ObservableObject {
     private func importCustomModel(_ url: URL) {
         Paths.ensureDirs()
         let dest = Paths.modelsDir.appendingPathComponent(url.lastPathComponent)
-        do {
-            if FileManager.default.fileExists(atPath: dest.path) {
-                try FileManager.default.removeItem(at: dest)
-            }
-            try FileManager.default.copyItem(at: url, to: dest)
+
+        // Ja fails jau atrodas modeļu mapē, neko nedzēšam un nepārkopējam.
+        if url.standardizedFileURL == dest.standardizedFileURL {
             refreshModels()
             selectModel(url.lastPathComponent)
-        } catch {
-            status = .error("Neizdevās pievienot modeli")
+            return
+        }
+
+        status = .loading
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let fm = FileManager.default
+            let tmp = dest.appendingPathExtension("tmp")
+            do {
+                // Notīrām iepriekšējo nepabeigto .tmp failu, ja tāds palicis.
+                if fm.fileExists(atPath: tmp.path) {
+                    try fm.removeItem(at: tmp)
+                }
+                try fm.copyItem(at: url, to: tmp)
+                // Tikai pēc veiksmīgas kopēšanas aizvietojam galamērķi.
+                if fm.fileExists(atPath: dest.path) {
+                    try fm.removeItem(at: dest)
+                }
+                try fm.moveItem(at: tmp, to: dest)
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.refreshModels()
+                    self.selectModel(url.lastPathComponent)
+                }
+            } catch {
+                try? fm.removeItem(at: tmp)
+                AppLogger.error("importCustomModel neizdevās: \(error.localizedDescription)")
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.status = .error("Neizdevās pievienot modeli")
+                }
+            }
         }
     }
 
@@ -390,7 +421,11 @@ final class AppState: ObservableObject {
 
     func setLanguage(_ code: String) { prefs.setLanguage(code) }
     func setMenuBarIconStyle(_ style: MenuBarIconStyle) { prefs.setMenuBarIconStyle(style) }
-    func setAppTheme(_ theme: AppTheme) { prefs.setAppTheme(theme) }
+    func setAppTheme(_ theme: AppTheme) {
+        prefs.setAppTheme(theme)
+        NSApp.appearance = theme.nsAppearance
+        SettingsWindowController.shared.updateAppearance()
+    }
     func setAutoCheckUpdates(_ enabled: Bool) { prefs.setAutoCheckUpdates(enabled) }
     func setBlurBackdrop(_ enabled: Bool) {
         prefs.setBlurBackdrop(enabled)
@@ -463,10 +498,8 @@ final class AppState: ObservableObject {
     func refreshInputMonitoring() { perms.refreshInputMonitoring() }
     func requestInputMonitoring() { perms.requestInputMonitoring() }
     func openInputMonitoringSettings() { perms.openInputMonitoringSettings() }
-    func resetAndPromptInputMonitoring() { perms.resetAndPromptInputMonitoring() }
 
     func refreshAccessibility() { perms.refreshAccessibility() }
-    func promptAccessibility() { perms.promptAccessibility() }
     func resetAndPromptAccessibility() { perms.resetAndPromptAccessibility() }
     func openAccessibilitySettings() { perms.openAccessibilitySettings() }
 
@@ -479,7 +512,7 @@ final class AppState: ObservableObject {
         deviceMonitor = nil
         monitor?.stop()
         recorder.tearDown()
-        engine.unload()
+        engine.unloadSync()
         UserDefaults.standard.synchronize()
         AppLogger.flush()
         _exit(0)

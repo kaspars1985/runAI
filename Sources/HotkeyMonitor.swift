@@ -1,6 +1,14 @@
 import Cocoa
 import CoreGraphics
 
+/// Karstā taustiņa darbība, ko atgriež tīrā stāvokļa mašīna.
+enum HotkeyAction: Equatable {
+    case none
+    case press
+    case release
+    case cancel
+}
+
 /// Globāls karstā taustiņa monitors (CGEventTap).
 /// Atbalsta: modifikatora taustiņu (turēšana), taustiņu kombinācijas un peles pogas.
 final class HotkeyMonitor {
@@ -26,6 +34,8 @@ final class HotkeyMonitor {
 
     func update(hotkey: Hotkey) {
         self.hotkey = hotkey
+        self.isDown = false
+        self.cancelledByCompoundKey = false
     }
 
     func start() {
@@ -72,6 +82,8 @@ final class HotkeyMonitor {
             CGEvent.tapEnable(tap: tap, enable: false)
             self.tap = nil
         }
+        isDown = false
+        cancelledByCompoundKey = false
     }
 
     // MARK: - Tveršana (jauna taustiņa iestatīšana)
@@ -159,96 +171,124 @@ final class HotkeyMonitor {
         cb?(h)
     }
 
-    private func handleMouse(type: CGEventType, event: CGEvent) -> Bool {
-        let button = Int32(event.getIntegerValueField(.mouseEventButtonNumber))
-        guard button == hotkey.mouseButton else { return false }
+    // MARK: - Tīrā stāvokļa mašīna (peles notikumi)
+
+    /// Tīra stāvokļa mašīna peles notikumiem. Atgriež (vai apēst notikumu, darbība).
+    func processMouseEvent(type: CGEventType, button: Int32) -> (consume: Bool, action: HotkeyAction) {
+        guard button == hotkey.mouseButton else { return (false, .none) }
         switch type {
         case .otherMouseDown:
             if !isDown {
                 isDown = true
-                AppLogger.info("HotkeyMonitor: hotkey press (mouse button \(button))")
-                DispatchQueue.main.async { [weak self] in self?.onPress?() }
+                return (true, .press)
             }
             // Apēdam notikumu, lai mērķa lietotne nesaņem klikšķi.
-            return true
+            return (true, .none)
         case .otherMouseUp:
             if isDown {
                 isDown = false
-                AppLogger.info("HotkeyMonitor: hotkey release (mouse button \(button))")
-                DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+                return (true, .release)
             }
             // Apēdam notikumu, lai mērķa lietotne nesaņem klikšķi.
-            return true
+            return (true, .none)
         default:
-            break
+            return (false, .none)
         }
-        return false
     }
 
-    private func handleKeyboard(type: CGEventType, event: CGEvent) -> Bool {
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+    // MARK: - Tīrā stāvokļa mašīna (tastatūras notikumi)
 
+    /// Tīra stāvokļa mašīna tastatūras notikumiem. Atgriež (vai apēst notikumu, darbība).
+    func processKeyboardEvent(type: CGEventType, keyCode: UInt16, flags: CGEventFlags, autorepeat: Bool) -> (consume: Bool, action: HotkeyAction) {
         if hotkey.isModifierOnly {
             // A-05: Ja lietotājs, turot modifikatoru, nospiež kādu parastu taustiņu (piem., ⌥ + ←, ⌥ + ⌫),
             // atceļam diktēšanu, lai netraucētu sistēmas saīsnēm.
             if type == .keyDown && isDown {
                 cancelledByCompoundKey = true
                 isDown = false
-                AppLogger.info("HotkeyMonitor: diktēšana atcelta (salikts taustiņš keyCode=\(keyCode))")
-                DispatchQueue.main.async { [weak self] in self?.onCancel?() }
-                return false
+                return (false, .cancel)
             }
 
-            guard type == .flagsChanged else { return false }
+            guard type == .flagsChanged else { return (false, .none) }
 
             // A-05: Atšķiram kreiso un labo modifikatora taustiņu (precīzs keyCode)
             let matchesKey = (keyCode == hotkey.keyCode)
-            guard matchesKey else { return false }
+            guard matchesKey else { return (false, .none) }
 
-            guard let flag = hotkey.modifierFlag else { return false }
-            let hasFlag = event.flags.contains(flag)
+            guard let flag = hotkey.modifierFlag else { return (false, .none) }
+            let hasFlag = flags.contains(flag)
             if hasFlag && !isDown {
                 cancelledByCompoundKey = false
                 isDown = true
-                AppLogger.info("HotkeyMonitor: hotkey press (modifier keyCode=\(keyCode))")
-                DispatchQueue.main.async { [weak self] in self?.onPress?() }
+                return (false, .press)
             } else if !hasFlag {
                 if isDown && !cancelledByCompoundKey {
                     isDown = false
-                    AppLogger.info("HotkeyMonitor: hotkey release (modifier keyCode=\(keyCode))")
-                    DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+                    return (false, .release)
                 }
                 isDown = false
                 cancelledByCompoundKey = false
             }
-            return false
+            return (false, .none)
         }
 
         switch type {
         case .keyDown:
-            if keyCode == hotkey.keyCode && hotkey.matches(keyCode: keyCode, flags: event.flags) {
+            if keyCode == hotkey.keyCode && hotkey.matches(keyCode: keyCode, flags: flags) {
                 if !autorepeat && !isDown {
                     isDown = true
-                    AppLogger.info("HotkeyMonitor: hotkey press (keyCode=\(keyCode))")
-                    DispatchQueue.main.async { [weak self] in self?.onPress?() }
+                    return (true, .press)
                 }
                 // Apēdam notikumu (arī autorepeat), lai priekšplāna lietotne nesaņem taustiņu.
-                return true
+                return (true, .none)
             }
+            return (false, .none)
         case .keyUp:
             if keyCode == hotkey.keyCode {
                 if isDown {
                     isDown = false
-                    AppLogger.info("HotkeyMonitor: hotkey release (keyCode=\(keyCode))")
-                    DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+                    return (true, .release)
                 }
-                // Apēdam notikumu, lai priekšplāna lietotne nesaņem taustiņa atlaišanu.
-                return true
+                // BUG FIX: Ja taustiņš nav mūsu "turēšanas" stāvoklī, laid to cauri,
+                // lai parastais key-up netiktu apēsts.
+                return (false, .none)
             }
+            return (false, .none)
         default:
-            break
+            return (false, .none)
         }
-        return false
+    }
+
+    // MARK: - Notikumu apstrādes (dispatch)
+
+    private func handleMouse(type: CGEventType, event: CGEvent) -> Bool {
+        let button = Int32(event.getIntegerValueField(.mouseEventButtonNumber))
+        let result = processMouseEvent(type: type, button: button)
+        dispatch(action: result.action, context: "mouse button \(button)")
+        return result.consume
+    }
+
+    private func handleKeyboard(type: CGEventType, event: CGEvent) -> Bool {
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        let result = processKeyboardEvent(type: type, keyCode: keyCode, flags: event.flags, autorepeat: autorepeat)
+        dispatch(action: result.action, context: "keyCode=\(keyCode)")
+        return result.consume
+    }
+
+    private func dispatch(action: HotkeyAction, context: String) {
+        switch action {
+        case .none:
+            break
+        case .press:
+            AppLogger.info("HotkeyMonitor: hotkey press (\(context))")
+            DispatchQueue.main.async { [weak self] in self?.onPress?() }
+        case .release:
+            AppLogger.info("HotkeyMonitor: hotkey release (\(context))")
+            DispatchQueue.main.async { [weak self] in self?.onRelease?() }
+        case .cancel:
+            AppLogger.info("HotkeyMonitor: diktēšana atcelta (salikts taustiņš \(context))")
+            DispatchQueue.main.async { [weak self] in self?.onCancel?() }
+        }
     }
 }

@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 /// Centralizēti pārvalda lietotnes lietotāja iestatījumus (preferences),
 /// to ielādi no `UserDefaults` un saglabāšanu tajos.
@@ -18,15 +17,18 @@ final class PreferencesManager: ObservableObject {
     @Published var blurBackdrop: Bool = true
     @Published var hudPosition: HUDPosition = .center
 
+    // MARK: - Privātais stāvoklis
+
+    private let defaults: UserDefaults
+
     // MARK: - Init
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         loadDefaults()
     }
 
     private func loadDefaults() {
-        let defaults = UserDefaults.standard
-
         if let data = defaults.data(forKey: "hotkey"),
            let h = try? JSONDecoder().decode(Hotkey.self, from: data) {
             hotkey = h
@@ -80,68 +82,61 @@ final class PreferencesManager: ObservableObject {
         } else {
             hudPosition = .center
         }
-
-        // Ja saglabātais UID ir AVAudioEngine virtuālais agregāts, atiestatām uz sistēmas noklusēto.
-        if let sel = selectedInputID, sel.contains("CADefaultDeviceAggregate") {
-            selectedInputID = AudioDevices.defaultInputUID()
-        }
     }
 
     // MARK: - Setteri
 
     func setLanguage(_ code: String) {
         language = code
-        UserDefaults.standard.set(code, forKey: "language")
+        defaults.set(code, forKey: "language")
     }
 
     func setMenuBarIconStyle(_ style: MenuBarIconStyle) {
         menuBarIconStyle = style
-        UserDefaults.standard.set(style.rawValue, forKey: "menuBarIconStyle")
+        defaults.set(style.rawValue, forKey: "menuBarIconStyle")
     }
 
     func setAppTheme(_ theme: AppTheme) {
-        UserDefaults.standard.set(theme.rawValue, forKey: "appTheme")
+        defaults.set(theme.rawValue, forKey: "appTheme")
         appTheme = theme
-        NSApp.appearance = theme.nsAppearance
-        SettingsWindowController.shared.updateAppearance(theme.nsAppearance)
     }
 
     func setAutoCheckUpdates(_ enabled: Bool) {
         autoCheckUpdates = enabled
-        UserDefaults.standard.set(enabled, forKey: "autoCheckUpdates")
+        defaults.set(enabled, forKey: "autoCheckUpdates")
     }
 
     func setBlurBackdrop(_ enabled: Bool) {
         blurBackdrop = enabled
-        UserDefaults.standard.set(enabled, forKey: "blurBackdrop")
+        defaults.set(enabled, forKey: "blurBackdrop")
     }
 
     func setHUDPosition(_ pos: HUDPosition) {
         hudPosition = pos
-        UserDefaults.standard.set(pos.rawValue, forKey: "hudPosition")
+        defaults.set(pos.rawValue, forKey: "hudPosition")
     }
 
     func setHotkey(_ h: Hotkey) {
         AppLogger.info("setHotkey: \(h.label)")
         hotkey = h
         if let data = try? JSONEncoder().encode(h) {
-            UserDefaults.standard.set(data, forKey: "hotkey")
+            defaults.set(data, forKey: "hotkey")
         }
     }
 
     func setSelectedModel(_ fileName: String?) {
         selectedModel = fileName
         if let fileName = fileName {
-            UserDefaults.standard.set(fileName, forKey: "selectedModel")
+            defaults.set(fileName, forKey: "selectedModel")
         } else {
-            UserDefaults.standard.removeObject(forKey: "selectedModel")
+            defaults.removeObject(forKey: "selectedModel")
         }
     }
 
     func setSelectedInput(_ uid: String?) {
         selectedInputID = uid
         if let uid = uid, !uid.isEmpty {
-            UserDefaults.standard.set(uid, forKey: "selectedInput")
+            defaults.set(uid, forKey: "selectedInput")
         }
     }
 }

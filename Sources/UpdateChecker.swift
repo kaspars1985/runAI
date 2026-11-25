@@ -4,7 +4,7 @@ import AppKit
 
 /// Versiju pārbaudītājs, kas sazinās ar GitHub Releases API,
 /// lai noskaidrotu, vai ir pieejama jaunāka runAI versija.
-final class UpdateChecker: ObservableObject {
+final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     @Published var isChecking = false
     @Published var updateAvailable = false
@@ -21,8 +21,15 @@ final class UpdateChecker: ObservableObject {
     @Published var downloadAssetURL: URL?
     var onRelaunch: (() -> Void)?
 
+    private var activeDownloadSession: URLSession?
+    private var activeTempDMG: URL?
+
     static let repoOwner = "kaspars1985"
     static let repoName = "runAI"
+
+    override init() {
+        super.init()
+    }
 
     /// Pašreizējā lietotnes versija no Info.plist.
     var currentVersion: String {
@@ -149,84 +156,106 @@ final class UpdateChecker: ObservableObject {
 
         let tempDMG = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("runAI-update-\(UUID().uuidString).dmg")
+        self.activeTempDMG = tempDMG
 
         var request = URLRequest(url: assetURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
         request.setValue("runAI-App", forHTTPHeaderField: "User-Agent")
 
-        let session = URLSession(configuration: .default,
-                                 delegate: DownloadProgressDelegate(owner: self),
-                                 delegateQueue: nil)
-        let task = session.downloadTask(with: request) { [weak self] location, response, error in
-            guard let self = self else { return }
+        let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        self.activeDownloadSession = session
 
-            if let error = error {
-                DispatchQueue.main.async {
-                    self.failUpdate(error.localizedDescription)
-                }
-                return
-            }
-            guard let location = location else {
-                DispatchQueue.main.async {
-                    self.failUpdate("Lejupielāde neizdevās.")
-                }
-                return
-            }
+        // Bez completion handler — progress un pabeigšana notiek delegāta metodēs.
+        session.downloadTask(with: request).resume()
+    }
 
-            // Pārvietojam lejupielādēto failu uz temp DMG ceļu.
-            do {
-                if FileManager.default.fileExists(atPath: tempDMG.path) {
-                    try FileManager.default.removeItem(at: tempDMG)
-                }
-                try FileManager.default.moveItem(at: location, to: tempDMG)
-            } catch {
-                DispatchQueue.main.async {
-                    self.failUpdate("Neizdevās saglabāt lejupielādi: \(error.localizedDescription)")
-                }
-                return
-            }
+    // MARK: - URLSessionDownloadDelegate
 
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        DispatchQueue.main.async {
+            self.updateProgress = min(max(progress, 0), 1.0)
+        }
+    }
+
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {
+        let tempDMG = self.activeTempDMG ?? URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("runAI-update-\(UUID().uuidString).dmg")
+
+        if let http = downloadTask.response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode) {
+            session.finishTasksAndInvalidate()
+            self.activeDownloadSession = nil
             DispatchQueue.main.async {
-                self.updateProgress = 1.0
-                self.updateStage = "Instalē atjauninājumu…"
+                self.failUpdate("Servera kļūda (HTTP \(http.statusCode))")
             }
+            return
+        }
 
-            // Instalēšana fonā.
+        do {
+            let fm = FileManager.default
+            if fm.fileExists(atPath: tempDMG.path) {
+                try fm.removeItem(at: tempDMG)
+            }
+            try fm.moveItem(at: location, to: tempDMG)
+        } catch {
+            session.finishTasksAndInvalidate()
+            self.activeDownloadSession = nil
+            DispatchQueue.main.async {
+                self.failUpdate("Neizdevās saglabāt lejupielādi: \(error.localizedDescription)")
+            }
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.updateProgress = 1.0
+            self.updateStage = "Instalē atjauninājumu…"
+            session.finishTasksAndInvalidate()
+            self.activeDownloadSession = nil
             DispatchQueue.global(qos: .userInitiated).async {
                 self.installUpdate(from: tempDMG)
             }
         }
-        task.resume()
     }
 
-    /// Faila lejupielādes gaitas delegāts.
-    private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
-        weak var owner: UpdateChecker?
-        init(owner: UpdateChecker) { self.owner = owner }
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    didCompleteWithError error: Error?) {
+        session.finishTasksAndInvalidate()
+        self.activeDownloadSession = nil
 
-        func urlSession(_ session: URLSession,
-                        downloadTask: URLSessionDownloadTask,
-                        didWriteData bytesWritten: Int64,
-                        totalBytesWritten: Int64,
-                        totalBytesExpectedToWrite: Int64) {
-            guard totalBytesExpectedToWrite > 0 else { return }
-            let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-            DispatchQueue.main.async {
-                self.owner?.updateProgress = min(max(progress, 0), 1.0)
+        if let error = error {
+            if let tempDMG = self.activeTempDMG,
+               FileManager.default.fileExists(atPath: tempDMG.path) {
+                try? FileManager.default.removeItem(at: tempDMG)
             }
-        }
-
-        func urlSession(_ session: URLSession,
-                        downloadTask: URLSessionDownloadTask,
-                        didFinishDownloadingTo location: URL) {
-            // Apstrāde notiek downloadTask pabeigšanas blokā.
+            DispatchQueue.main.async {
+                self.failUpdate(error.localizedDescription)
+            }
         }
     }
 
     /// Montē DMG, aizstāj lietotni, notīra karantīnu, atmontē un pārstartē.
     private func installUpdate(from tempDMG: URL) {
+        defer { try? FileManager.default.removeItem(at: tempDMG) }
+
+        var mountedPath: String?
+        defer {
+            if let mp = mountedPath {
+                runProcess("/usr/bin/hdiutil", ["detach", mp, "-force"])
+            }
+        }
+
         do {
             // 1. Montējam DMG.
             let mountPoint = try mountDMG(tempDMG)
+            mountedPath = mountPoint
 
             // 2. Atrodam .app montētajā sējumā.
             let sourceApp = try findApp(in: mountPoint)
@@ -243,20 +272,12 @@ final class UpdateChecker: ObservableObject {
             // 5. Notīrām karantīnu.
             runProcess("/usr/bin/xattr", ["-cr", targetApp.path])
 
-            // 6. Atmontējam DMG.
-            runProcess("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
-
-            // 7. Dzēšam temp DMG.
-            try? FileManager.default.removeItem(at: tempDMG)
-
             DispatchQueue.main.async {
                 self.updateStage = "Pārstartē…"
             }
 
-            // 8. Pārstartējam lietotni un aizveram pašreizējo.
-            let relaunch = "/bin/bash"
-            let script = "(sleep 0.8 && open -n \"\(targetApp.path)\") &"
-            runProcess(relaunch, ["-c", script])
+            // 6. Pārstartējam lietotni un aizveram pašreizējo.
+            runProcess("/bin/bash", ["-c", "sleep 0.8 && open -n \"$1\" >/dev/null 2>&1 &", "_", targetApp.path])
 
             DispatchQueue.main.async {
                 if let custom = self.onRelaunch {
@@ -304,7 +325,7 @@ final class UpdateChecker: ObservableObject {
     }
 
     /// Pārbauda, vai avota .app satur derīgu Info.plist ar CFBundleIdentifier "lv.runai.app".
-    private func validateSourceApp(_ sourceApp: URL) throws {
+    func validateSourceApp(_ sourceApp: URL) throws {
         let infoPlist = sourceApp
             .appendingPathComponent("Contents")
             .appendingPathComponent("Info.plist")
@@ -348,25 +369,32 @@ final class UpdateChecker: ObservableObject {
     }
 
     /// Aizstāj mērķa lietotni ar jauno no DMG.
-    private func replaceApp(source: URL, target: URL) throws {
+    func replaceApp(source: URL, target: URL) throws {
         let fm = FileManager.default
+        let backup = target.appendingPathExtension("old")
 
-        // Ja mērķis ir pašreizējā lietotne, pārvietojam uz .old, lai varētu aizstāt.
+        // Ja mērķis eksistē, pārvietojam uz .old, lai varētu aizstāt.
         if fm.fileExists(atPath: target.path) {
-            let backup = target.appendingPathExtension("old")
-            try? fm.removeItem(at: backup)
-            do {
-                try fm.moveItem(at: target, to: backup)
-            } catch {
-                // Ja nevar pārvietot (piem., lietotne darbojas), mēģinām dzēst.
-                try? fm.removeItem(at: target)
+            if fm.fileExists(atPath: backup.path) {
+                try? fm.removeItem(at: backup)
             }
+            try fm.moveItem(at: target, to: backup)
         }
 
-        try fm.copyItem(at: source, to: target)
+        do {
+            try fm.copyItem(at: source, to: target)
+        } catch {
+            // Atjaunojam iepriekšējo lietotni, ja kopēšana neizdevās.
+            if fm.fileExists(atPath: target.path) {
+                try? fm.removeItem(at: target)
+            }
+            if fm.fileExists(atPath: backup.path) {
+                try? fm.moveItem(at: backup, to: target)
+            }
+            throw error
+        }
 
-        // Notīrām veco rezerves kopiju.
-        let backup = target.appendingPathExtension("old")
+        // Notīrām veco rezerves kopiju tikai pēc veiksmīgas kopēšanas.
         try? fm.removeItem(at: backup)
     }
 
@@ -402,8 +430,35 @@ final class UpdateChecker: ObservableObject {
         process.waitUntilExit()
     }
 
-    /// Semantiskā versiju salīdzināšana (piem., 1.10 > 1.2, 1.1 > 1.0).
+    /// Semantiskā versiju salīdzināšana (piem., 1.10 > 1.2, 1.1 > 1.0, 1.0 > 1.0-beta).
     static func isVersion(_ v1: String, greaterThan v2: String) -> Bool {
-        return v1.compare(v2, options: .numeric) == .orderedDescending
+        func split(_ v: String) -> (core: [Int], prerelease: String?) {
+            let parts = v.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+            let coreStr = String(parts.first ?? "")
+            let pre = parts.count > 1 ? String(parts[1]) : nil
+            let core = coreStr.split(separator: ".").map { Int($0) ?? 0 }
+            return (core, pre)
+        }
+
+        let (core1, pre1) = split(v1)
+        let (core2, pre2) = split(v2)
+
+        let maxLen = max(core1.count, core2.count)
+        let padded1 = core1 + Array(repeating: 0, count: maxLen - core1.count)
+        let padded2 = core2 + Array(repeating: 0, count: maxLen - core2.count)
+
+        for i in 0..<maxLen {
+            if padded1[i] != padded2[i] {
+                return padded1[i] > padded2[i]
+            }
+        }
+
+        // Kodoli vienādi — salīdzinām pirmsizlaiduma atzīmes.
+        if pre1 == nil && pre2 != nil { return true }
+        if pre1 != nil && pre2 == nil { return false }
+        if let p1 = pre1, let p2 = pre2 {
+            return p1.compare(p2, options: .numeric) == .orderedDescending
+        }
+        return false
     }
 }

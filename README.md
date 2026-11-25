@@ -103,6 +103,13 @@ Frameworks/
 
 ## Izmaiņu vēsture
 
+- **v3.1.0** – kvalitātes audita labojumi, drošība un stabilitāte:
+  - Labota SwiftUI stāvokļa sinhronizācija (`PreferencesManager`, `PermissionsManager` un `UpdateChecker` izmaiņas tagad uzreiz atjauno iestatījumu logu un izvēlnes joslu).
+  - Novērsta `keyUp` notikumu apēšana visā sistēmā pielāgotām taustiņu kombinācijām (`HotkeyMonitor`).
+  - Labota starpliktuves rezerves kopija ārpus teksta laukiem (`TextInserter`): pārbauda Accessibility elementa rediģējamību, `NSPasteboard.changeCount` un izmanto izolētu `.privateState` avotu.
+  - Automātiskā atjauninātāja un `install.sh` uzlabojumi: reāllaika lejupielādes progress bez `URLSession` noplūdes, HTTP 2xx pārbaude, droša `replaceApp` atjaunošana kļūmes gadījumā, pozicionāls arguments pārstartēšanai (novērsta shell injekcija), precīza semver versiju salīdzināšana un kļūdu paziņojumi iestatījumos.
+  - Pavedienu drošība un veiktspēja: `OSAllocatedUnfairLock` (`AudioRecorder`, `WhisperEngine`), pavediendroša `AppLogger` formatēšana un rotācija, asinhrona pielāgoto modeļu importēšana bez paša faila dzēšanas, modeļu pārslēgšanas paaudzes aizsardzība un viena piegājiena CoreGraphics HUD viļņa zīmēšana.
+  - Paplašināts vienībtestu komplekts no 34 līdz 52 testiem (`HotkeyMonitor`, `TextInserter`, `PreferencesManager`, `UpdateChecker`).
 - **v3.0.1** – drošības un stabilitātes uzlabojumi:
   - Automātiskā atjauninātāja DMG pakotnes bundle ID pārbaude (`validateSourceApp`).
   - Droša resursu tīrīšana (`trap`) instalācijas skriptā `install.sh`.

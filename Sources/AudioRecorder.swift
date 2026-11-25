@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import AudioToolbox
+import os
 
 enum AudioRecorderError: LocalizedError {
     case noInputDevice
@@ -19,16 +20,22 @@ enum AudioRecorderError: LocalizedError {
 /// Tver mikrofonu, pārveido uz 16 kHz / mono / float32 un uzkrāj paraugus.
 final class AudioRecorder {
     private var engine: AVAudioEngine?
-    private var converter: AVAudioConverter?
     private let targetFormat: AVAudioFormat
     private let queue = DispatchQueue(label: "lv.runai.audio")
     private let sampleRate: Double = 16000
     private var isTapped = false
     private var currentDeviceUID: String?
-    private var lastConfiguredDeviceUID: String?
     private var configObserver: NSObjectProtocol?
     private let maxSamples = 16000 * 60 * 10 // 10 minūtes @ 16 kHz mono (A-03: aizsardzība pret atmiņas noplūdi)
+
+    /// Aizsargā `maxDurationNotified` — piekļuve tikai `queue.sync` / `queue.async` iekšienē.
     private var maxDurationNotified = false
+
+    /// Aizsargā konvertētāju starp galveno pavedienu un CoreAudio realtime pavedienu.
+    private let converterLock = OSAllocatedUnfairLock<AVAudioConverter?>(initialState: nil)
+
+    /// Aizsargā `isRunning` — lasāms no jebkura pavediena.
+    private let runningLock = OSAllocatedUnfairLock(initialState: false)
 
     private(set) var samples: [Float] = []
     /// Mikrofona līmenis (0…1), tiek izsaukts galvenajā pavedienā.
@@ -38,7 +45,13 @@ final class AudioRecorder {
 
     /// Seko līdzi, vai ieraksts ir aktīvs. Tiek uzturēts atsevišķi no engine.isRunning,
     /// jo CoreAudio var īslaicīgi atiestatīt engine Bluetooth frekvenču maiņas laikā.
-    private(set) var isRunning: Bool = false
+    var isRunning: Bool {
+        runningLock.withLock { $0 }
+    }
+
+    private func setRunning(_ value: Bool) {
+        runningLock.withLock { $0 = value }
+    }
 
     init() {
         targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
@@ -55,10 +68,10 @@ final class AudioRecorder {
         }
         queue.sync {
             samples.removeAll(keepingCapacity: true)
+            maxDurationNotified = false
         }
-        converter = nil
-        maxDurationNotified = false
-        isRunning = true
+        converterLock.withLock { $0 = nil }
+        setRunning(true)
 
         do {
             try startEngine(applyDeviceUID: true)
@@ -67,7 +80,7 @@ final class AudioRecorder {
             do {
                 try startEngine(applyDeviceUID: false)
             } catch {
-                isRunning = false
+                setRunning(false)
                 throw error
             }
         }
@@ -75,28 +88,14 @@ final class AudioRecorder {
     }
 
     private func startEngine(applyDeviceUID: Bool) throws {
-        let requestedUID = applyDeviceUID ? currentDeviceUID : nil
-
         // Vienmēr sakopjam iepriekšējo engine — pat ja konfigurācija šķietami nav mainījusies.
         // Bluetooth ierīču atvienošanās, miega režīms un frekvenču maiņa (48kHz A2DP ↔ 24/16kHz HFP)
         // padara veco AVAudioEngine instanci nederīgu, un tā rezultātā tiek ierakstīti 0 paraugi.
-        if let oldEng = self.engine {
-            if isTapped {
-                oldEng.inputNode.removeTap(onBus: 0)
-                isTapped = false
-            }
-            if oldEng.isRunning {
-                oldEng.stop()
-            }
-            oldEng.reset()
-            self.engine = nil
-        }
-        converter = nil
+        tearDownEngine()
 
         // Jauna AVAudioEngine instance — inputNode iegūst aktuālo aparatūras formātu un aktīvo maršrutu.
         let eng = AVAudioEngine()
         self.engine = eng
-        self.lastConfiguredDeviceUID = requestedUID
 
         if applyDeviceUID, let uid = currentDeviceUID {
             let defaultUID = AudioDevices.defaultInputUID()
@@ -128,13 +127,14 @@ final class AudioRecorder {
 
         // SVARĪGI: konfigurējam konvertētāju PIRMS tap uzstādīšanas, lai izvairītos no
         // datu sacensības starp CoreAudio realtime pavedienu un galveno pavedienu.
-        // Pēc tap uzstādīšanas `self.converter` vairs netiek modificēts no process().
+        // Pēc tap uzstādīšanas `converter` vairs netiek modificēts no process().
         if outFormat.sampleRate == targetFormat.sampleRate,
            outFormat.channelCount == targetFormat.channelCount,
            outFormat.commonFormat == targetFormat.commonFormat {
-            self.converter = nil
+            converterLock.withLock { $0 = nil }
         } else {
-            self.converter = AVAudioConverter(from: outFormat, to: targetFormat)
+            let newConverter = AVAudioConverter(from: outFormat, to: targetFormat)
+            converterLock.withLock { $0 = newConverter }
         }
 
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
@@ -153,7 +153,7 @@ final class AudioRecorder {
         configObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: eng,
-            queue: nil) { [weak self] _ in
+            queue: .main) { [weak self] _ in
                 self?.handleConfigurationChange()
             }
     }
@@ -193,8 +193,10 @@ final class AudioRecorder {
         // paraugu frekvence (48kHz A2DP ↔ 24/16kHz HFP) — nākamajā ierakstā tiek iegūti 0 paraugi.
         // Tā vietā engine pilnībā apturam un atbrīvojam.
         tearDownEngine()
-        isRunning = false
-        maxDurationNotified = false
+        setRunning(false)
+        queue.sync {
+            maxDurationNotified = false
+        }
         AppLogger.info("AudioRecorder.stop: apturēts")
     }
 
@@ -217,14 +219,13 @@ final class AudioRecorder {
             eng.reset()
         }
         engine = nil
-        converter = nil
-        lastConfiguredDeviceUID = nil
+        converterLock.withLock { $0 = nil }
     }
 
     /// Pilnībā atbrīvo audio resursus (piem., lietotni aizverot).
     func tearDown() {
         tearDownEngine()
-        isRunning = false
+        setRunning(false)
     }
 
     /// Atgriež un notīra uzkrātos paraugus (pavediendroši).
@@ -252,10 +253,11 @@ final class AudioRecorder {
             return
         }
 
-        // SVARĪGI: lasām konvertētāju lokāli, NEMODIFICĒJOT self.converter — tas tika
+        // SVARĪGI: lasām konvertētāju lokāli, NEMODIFICĒJOT `converter` — tas tika
         // konfigurēts startEngine() laikā pirms tap uzstādīšanas. Modificēšana šeit
         // radītu datu sacensību ar galveno pavedienu.
-        guard let conv = self.converter else { return }
+        let conv = converterLock.withLock { $0 }
+        guard let conv = conv else { return }
 
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
@@ -275,7 +277,12 @@ final class AudioRecorder {
         conv.convert(to: out, error: &convError, withInputFrom: inputBlock)
 
         if let convError = convError {
-            AppLogger.warn("AudioRecorder.process: konvertēšana neizdevās: \(convError.localizedDescription)")
+            // SVARĪGI: NEizsaucam AppLogger.warn tieši — šī ir CoreAudio realtime pavediens.
+            // Pārvietojam žurnālu uz mūsu sērijveida rindu.
+            let desc = convError.localizedDescription
+            queue.async {
+                AppLogger.warn("AudioRecorder.process: konvertēšana neizdevās: \(desc)")
+            }
             return
         }
         guard out.frameLength > 0 else { return }

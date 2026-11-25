@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import AppKit
 
 // MARK: - Testu ietvars
 
@@ -67,6 +68,33 @@ func expectEqual<T: Equatable>(_ a: T, _ b: T, _ message: String = "", file: Str
 func suite(_ name: String, _ block: () -> Void) {
     print("\n\(BOLD)\(CYAN)▶ \(name)\(RESET)")
     block()
+}
+
+// MARK: - Testu palīgi
+
+/// Izveido pagaidu direktoriju un atgriež tā URL. Izsaucējam jāiztīra ar `try? FileManager.default.removeItem(at:)`.
+func makeTempDir() throws -> URL {
+    let url = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("runAI-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}
+
+/// Izveido viltus .app pakotni ar Info.plist saturošu CFBundleIdentifier.
+func makeFakeApp(at url: URL, bundleId: String?, marker: String? = nil) throws {
+    let fm = FileManager.default
+    let contents = url.appendingPathComponent("Contents", isDirectory: true)
+    try fm.createDirectory(at: contents, withIntermediateDirectories: true)
+
+    if let bundleId = bundleId {
+        let plist: [String: Any] = ["CFBundleIdentifier": bundleId]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+    }
+
+    if let marker = marker {
+        try marker.data(using: .utf8)?.write(to: contents.appendingPathComponent("marker.txt"))
+    }
 }
 
 // MARK: - Hotkey testi
@@ -148,6 +176,82 @@ func runHotkeyTests() {
     }
 }
 
+// MARK: - HotkeyMonitor testi
+
+func runHotkeyMonitorTests() {
+    suite("HotkeyMonitorTests") {
+        test("modifier-only press and release") {
+            let monitor = HotkeyMonitor(hotkey: .default) // right Option 0x3D
+            let press = monitor.processKeyboardEvent(type: .flagsChanged, keyCode: 0x3D, flags: .maskAlternate, autorepeat: false)
+            expectEqual(press.action, .press)
+            expect(!press.consume, "modifier-only press should not consume")
+
+            let release = monitor.processKeyboardEvent(type: .flagsChanged, keyCode: 0x3D, flags: [], autorepeat: false)
+            expectEqual(release.action, .release)
+            expect(!release.consume, "modifier-only release should not consume")
+        }
+
+        test("modifier-only compound-key cancel then release -> none") {
+            let monitor = HotkeyMonitor(hotkey: .default)
+            let press = monitor.processKeyboardEvent(type: .flagsChanged, keyCode: 0x3D, flags: .maskAlternate, autorepeat: false)
+            expectEqual(press.action, .press)
+
+            // Nospiežam citu taustiņu, turot modifikatoru — atcelšana.
+            let cancel = monitor.processKeyboardEvent(type: .keyDown, keyCode: 0x7B, flags: .maskAlternate, autorepeat: false)
+            expectEqual(cancel.action, .cancel)
+            expect(!cancel.consume, "compound-key cancel should not consume")
+
+            // Atlaidam modifikatoru — pēc atcelšanas nekāda darbība.
+            let release = monitor.processKeyboardEvent(type: .flagsChanged, keyCode: 0x3D, flags: [], autorepeat: false)
+            expectEqual(release.action, .none)
+        }
+
+        test("combo hotkey Cmd+A press and release consumes both") {
+            let hk = Hotkey(keyCode: 0x00, modifiers: CGEventFlags.maskCommand.rawValue,
+                            isMouse: false, mouseButton: 0, isModifierOnly: false)
+            let monitor = HotkeyMonitor(hotkey: hk)
+
+            let press = monitor.processKeyboardEvent(type: .keyDown, keyCode: 0x00, flags: .maskCommand, autorepeat: false)
+            expectEqual(press.action, .press)
+            expect(press.consume, "combo press should consume")
+
+            let release = monitor.processKeyboardEvent(type: .keyUp, keyCode: 0x00, flags: .maskCommand, autorepeat: false)
+            expectEqual(release.action, .release)
+            expect(release.consume, "combo release should consume")
+        }
+
+        test("regression bug #5: plain keyUp of non-modifier hotkey when !isDown is not consumed") {
+            // Cmd+Space hotkey (Space = 0x31)
+            let hk = Hotkey(keyCode: 0x31, modifiers: CGEventFlags.maskCommand.rawValue,
+                            isMouse: false, mouseButton: 0, isModifierOnly: false)
+            let monitor = HotkeyMonitor(hotkey: hk)
+
+            // Nospiežam Space bez Cmd — nav mūsu hotkey, neapēdam.
+            let down = monitor.processKeyboardEvent(type: .keyDown, keyCode: 0x31, flags: [], autorepeat: false)
+            expectEqual(down.action, .none)
+            expect(!down.consume, "plain keyDown should not consume")
+
+            // Atlaidam Space — isDown == false, tāpēc neapēdam un darbība .none.
+            let up = monitor.processKeyboardEvent(type: .keyUp, keyCode: 0x31, flags: [], autorepeat: false)
+            expectEqual(up.action, .none)
+            expect(!up.consume, "plain keyUp when !isDown must not be consumed (bug #5)")
+        }
+
+        test("mouse button press and release consumes and returns press/release") {
+            let hk = Hotkey(keyCode: 0, modifiers: 0, isMouse: true, mouseButton: 2, isModifierOnly: false)
+            let monitor = HotkeyMonitor(hotkey: hk)
+
+            let press = monitor.processMouseEvent(type: .otherMouseDown, button: 2)
+            expectEqual(press.action, .press)
+            expect(press.consume, "mouse press should consume")
+
+            let release = monitor.processMouseEvent(type: .otherMouseUp, button: 2)
+            expectEqual(release.action, .release)
+            expect(release.consume, "mouse release should consume")
+        }
+    }
+}
+
 // MARK: - UpdateChecker testi
 
 func runUpdateCheckerTests() {
@@ -166,6 +270,16 @@ func runUpdateCheckerTests() {
 
         test("isVersion: 1.0 > 1.1 is false") {
             expect(!UpdateChecker.isVersion("1.0", greaterThan: "1.1"))
+        }
+
+        test("isVersion: 3.0.0 vs 3.0 are equal (not greater)") {
+            expect(!UpdateChecker.isVersion("3.0.0", greaterThan: "3.0"))
+            expect(!UpdateChecker.isVersion("3.0", greaterThan: "3.0.0"))
+        }
+
+        test("isVersion: prerelease is less than release") {
+            expect(!UpdateChecker.isVersion("3.0.1-beta.1", greaterThan: "3.0.1"))
+            expect(UpdateChecker.isVersion("3.0.1", greaterThan: "3.0.1-beta.1"))
         }
 
         test("extractDMGURL finds runAI.dmg") {
@@ -202,6 +316,84 @@ func runUpdateCheckerTests() {
         test("extractDMGURL returns nil when assets missing") {
             let json: [String: Any] = [:]
             expect(UpdateChecker.extractDMGURL(from: json) == nil)
+        }
+
+        test("validateSourceApp succeeds for valid bundle") {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let app = dir.appendingPathComponent("runAI.app")
+            try makeFakeApp(at: app, bundleId: "lv.runai.app")
+
+            let checker = UpdateChecker()
+            var threw = false
+            do { try checker.validateSourceApp(app) } catch { threw = true }
+            expect(!threw, "valid bundle should not throw")
+        }
+
+        test("validateSourceApp throws for wrong bundle ID") {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let app = dir.appendingPathComponent("runAI.app")
+            try makeFakeApp(at: app, bundleId: "com.example.evil")
+
+            let checker = UpdateChecker()
+            var threw = false
+            do { try checker.validateSourceApp(app) } catch { threw = true }
+            expect(threw, "wrong bundle ID should throw")
+        }
+
+        test("validateSourceApp throws when Info.plist missing") {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let app = dir.appendingPathComponent("runAI.app")
+            try makeFakeApp(at: app, bundleId: nil)
+
+            let checker = UpdateChecker()
+            var threw = false
+            do { try checker.validateSourceApp(app) } catch { threw = true }
+            expect(threw, "missing Info.plist should throw")
+        }
+
+        test("replaceApp successfully replaces target bundle") {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+
+            let source = dir.appendingPathComponent("source.app")
+            let target = dir.appendingPathComponent("target.app")
+            try makeFakeApp(at: source, bundleId: "lv.runai.app", marker: "NEW")
+            try makeFakeApp(at: target, bundleId: "lv.runai.app", marker: "OLD")
+
+            let checker = UpdateChecker()
+            try checker.replaceApp(source: source, target: target)
+
+            let markerURL = target.appendingPathComponent("Contents/marker.txt")
+            let content = try String(contentsOf: markerURL, encoding: .utf8)
+            expectEqual(content, "NEW", "target should contain new bundle content")
+
+            let backup = target.appendingPathExtension("old")
+            expect(!FileManager.default.fileExists(atPath: backup.path), ".old backup should be removed")
+        }
+
+        test("replaceApp restores original target when copy fails") {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+
+            let missingSource = dir.appendingPathComponent("missing.app")
+            let target = dir.appendingPathComponent("target.app")
+            try makeFakeApp(at: target, bundleId: "lv.runai.app", marker: "ORIGINAL")
+
+            let checker = UpdateChecker()
+            var threw = false
+            do { try checker.replaceApp(source: missingSource, target: target) } catch { threw = true }
+            expect(threw, "replaceApp should throw when source missing")
+
+            // Mērķis atjaunots neskarts.
+            let markerURL = target.appendingPathComponent("Contents/marker.txt")
+            let content = try String(contentsOf: markerURL, encoding: .utf8)
+            expectEqual(content, "ORIGINAL", "original target should be restored intact")
+
+            let backup = target.appendingPathExtension("old")
+            expect(!FileManager.default.fileExists(atPath: backup.path), ".old backup should not be left behind")
         }
     }
 }
@@ -308,10 +500,110 @@ func runModelCatalogTests() {
     }
 }
 
+// MARK: - TextInserter testi
+
+func runTextInserterTests() {
+    suite("TextInserterTests") {
+        test("shouldFallbackToPaste returns true for text roles") {
+            expect(TextInserter.shouldFallbackToPaste(role: "AXTextField", isEditable: nil))
+            expect(TextInserter.shouldFallbackToPaste(role: "AXTextArea", isEditable: nil))
+            expect(TextInserter.shouldFallbackToPaste(role: "AXWebArea", isEditable: nil))
+            expect(TextInserter.shouldFallbackToPaste(role: nil, isEditable: nil))
+        }
+
+        test("shouldFallbackToPaste returns false for non-text roles") {
+            expect(!TextInserter.shouldFallbackToPaste(role: "AXButton", isEditable: false))
+            expect(!TextInserter.shouldFallbackToPaste(role: "AXScrollArea", isEditable: false))
+            expect(!TextInserter.shouldFallbackToPaste(role: "AXOutline", isEditable: false))
+        }
+
+        test("shouldFallbackToPaste returns true for editable group") {
+            expect(TextInserter.shouldFallbackToPaste(role: "AXGroup", isEditable: true))
+        }
+
+        test("snapshotPasteboard/restorePasteboard roundtrip") {
+            let pb = NSPasteboard.withUniqueName()
+            defer { pb.releaseGlobally() }
+
+            pb.clearContents()
+            pb.setString("hello", forType: .string)
+            pb.addTypes([NSPasteboard.PasteboardType("lv.runai.test.custom")], owner: nil)
+            if let item = pb.pasteboardItems?.first {
+                item.setData(Data([0x01, 0x02, 0x03]), forType: NSPasteboard.PasteboardType("lv.runai.test.custom"))
+            }
+
+            let snapshot = TextInserter.snapshotPasteboard(pb)
+            expect(!snapshot.isEmpty, "snapshot should not be empty")
+
+            // Aizstājam saturu.
+            pb.clearContents()
+            pb.setString("replaced", forType: .string)
+            expectEqual(pb.string(forType: .string), "replaced")
+
+            // Atjaunojam.
+            TextInserter.restorePasteboard(pb, items: snapshot)
+            expectEqual(pb.string(forType: .string), "hello", "restored string should match original")
+            let customData = pb.pasteboardItems?.first?.data(forType: NSPasteboard.PasteboardType("lv.runai.test.custom"))
+            expectEqual(customData, Data([0x01, 0x02, 0x03]), "restored custom data should match original")
+        }
+    }
+}
+
+// MARK: - PreferencesManager testi
+
+func runPreferencesManagerTests() {
+    suite("PreferencesManagerTests") {
+        test("ignores CADefaultDeviceAggregate and 0 in selectedInput") {
+            MainActor.assumeIsolated {
+                let suiteName = "lv.runai.tests." + UUID().uuidString
+                guard let defaults = UserDefaults(suiteName: suiteName) else {
+                    expect(false, "failed to create isolated UserDefaults")
+                    return
+                }
+                defer { defaults.removePersistentDomain(forName: suiteName) }
+
+                defaults.set("CADefaultDeviceAggregate", forKey: "selectedInput")
+                let pm1 = PreferencesManager(defaults: defaults)
+                expect(pm1.selectedInputID == nil, "CADefaultDeviceAggregate should be ignored")
+
+                defaults.set("0", forKey: "selectedInput")
+                let pm2 = PreferencesManager(defaults: defaults)
+                expect(pm2.selectedInputID == nil, "\"0\" should be ignored")
+            }
+        }
+
+        test("persists language, hudPosition, blurBackdrop, hotkey across instances") {
+            MainActor.assumeIsolated {
+                let suiteName = "lv.runai.tests." + UUID().uuidString
+                guard let defaults = UserDefaults(suiteName: suiteName) else {
+                    expect(false, "failed to create isolated UserDefaults")
+                    return
+                }
+                defer { defaults.removePersistentDomain(forName: suiteName) }
+
+                let pm1 = PreferencesManager(defaults: defaults)
+                pm1.setLanguage("en")
+                pm1.setHUDPosition(.top)
+                pm1.setBlurBackdrop(false)
+                let customHotkey = Hotkey(keyCode: 0x00, modifiers: CGEventFlags.maskCommand.rawValue,
+                                          isMouse: false, mouseButton: 0, isModifierOnly: false)
+                pm1.setHotkey(customHotkey)
+
+                let pm2 = PreferencesManager(defaults: defaults)
+                expectEqual(pm2.language, "en")
+                expectEqual(pm2.hudPosition, .top)
+                expectEqual(pm2.blurBackdrop, false)
+                expectEqual(pm2.hotkey, customHotkey)
+            }
+        }
+    }
+}
+
 // MARK: - Galvenā funkcija
 
 @main
 struct TestMain {
+    @MainActor
     static func main() {
         let start = Date()
 
@@ -319,9 +611,12 @@ struct TestMain {
         print("\(DIM)\(Date())\(RESET)")
 
         runHotkeyTests()
+        runHotkeyMonitorTests()
         runUpdateCheckerTests()
         runAudioGuardTests()
         runModelCatalogTests()
+        runTextInserterTests()
+        runPreferencesManagerTests()
 
         let elapsed = Date().timeIntervalSince(start)
         let total = ctx.passed + ctx.failed

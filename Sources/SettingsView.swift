@@ -170,6 +170,14 @@ struct SettingsView: View {
 
             updateStatusView
         }
+        .alert("Atjaunināšanas kļūda", isPresented: Binding(
+            get: { updates.errorMessage != nil },
+            set: { if !$0 { updates.errorMessage = nil } }
+        )) {
+            Button("Labi", role: .cancel) {}
+        } message: {
+            Text(updates.errorMessage ?? "")
+        }
     }
 
     private var updateStatusView: some View {
@@ -261,7 +269,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("Turiet taustiņu nospiestu un runājiet. Atlaižot — teksts tiks ievietots tur, kur atrodas kursors. Darbojas gan kreisais, gan labais ⌥ Option.")
+                    Text("Turiet taustiņu nospiestu un runājiet. Atlaižot — teksts tiks ievietots tur, kur atrodas kursors. Pēc noklusējuma darbojas labais ⌥ Option.")
                         .font(.system(size: 10.5))
                         .foregroundColor(colors.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -338,7 +346,9 @@ struct SettingsView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(colors.textSecondary)
 
-                    ThemeSegmentedControl(
+                    SegmentedOptionControl(
+                        title: { $0.title },
+                        iconName: { $0.iconName },
                         selection: Binding(
                             get: { state.appTheme },
                             set: { state.setAppTheme($0) }
@@ -416,7 +426,9 @@ struct SettingsView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(colors.textSecondary)
 
-                    HUDPositionSegmentedControl(
+                    SegmentedOptionControl(
+                        title: { $0.title },
+                        iconName: { $0.iconName },
                         selection: Binding(
                             get: { state.hudPosition },
                             set: { state.setHUDPosition($0) }
@@ -642,71 +654,33 @@ private struct FlatButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Tēmas segmentētais slēdzis
+// MARK: - Segmentētais izvēles slēdzis (ģenerisks)
 
-private struct ThemeSegmentedControl: View {
-    @Binding var selection: AppTheme
+private struct SegmentedOptionControl<Option: CaseIterable & Identifiable & Equatable>: View
+where Option.AllCases: RandomAccessCollection {
+    let title: (Option) -> String
+    let iconName: (Option) -> String
+    @Binding var selection: Option
     let colors: ThemeColors
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(AppTheme.allCases) { theme in
+            ForEach(Array(Option.allCases)) { option in
                 Button {
-                    selection = theme
+                    selection = option
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: theme.iconName)
+                        Image(systemName: iconName(option))
                             .font(.system(size: 10))
-                        Text(theme.title)
+                        Text(title(option))
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(selection == theme ? colors.textPrimary : colors.textSecondary)
+                    .foregroundColor(selection == option ? colors.textPrimary : colors.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
                     .background(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(selection == theme ? colors.cardBg : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(2)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(colors.keycapBg)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(colors.cardBorder, lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - HUD pozīcijas izvēle
-
-private struct HUDPositionSegmentedControl: View {
-    @Binding var selection: HUDPosition
-    let colors: ThemeColors
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(HUDPosition.allCases) { pos in
-                Button {
-                    selection = pos
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: pos.iconName)
-                            .font(.system(size: 10))
-                        Text(pos.title)
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(selection == pos ? colors.textPrimary : colors.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(selection == pos ? colors.cardBg : Color.clear)
+                            .fill(selection == option ? colors.cardBg : Color.clear)
                     )
                 }
                 .buttonStyle(.plain)

@@ -16,7 +16,6 @@ final class HUDController {
     private var phase: CGFloat = 0
     private var pulse: CGFloat = 0
     private var startTime: CFTimeInterval = 0
-    private var isVisible = false
 
     init() {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: HUDView.containerWidth, height: HUDView.containerHeight),
@@ -40,7 +39,6 @@ final class HUDController {
     func showRecording(hotkeyText: String) {
         hudView.mode = .recording
         hudView.statusText = "\(hotkeyText) turēts · Klausās balsi..."
-        hudView.rightText = nil
         hudView.level = 0
         startTime = CACurrentMediaTime()
         present()
@@ -50,15 +48,13 @@ final class HUDController {
     func showTranscribing() {
         hudView.mode = .transcribing
         hudView.statusText = "⚡ Atlaid taustiņu · Atšifrē..."
-        hudView.rightText = "Metal GPU"
         present()
     }
 
     /// Rāda veiksmes stāvokli (teksts ievietots vai nokopēts).
-    func showSuccess(message: String, isCopiedOnly: Bool) {
+    func showSuccess(message: String) {
         hudView.mode = .success
         hudView.statusText = "✓ \(message)"
-        hudView.rightText = "100% lokāli"
         present()
     }
 
@@ -66,18 +62,6 @@ final class HUDController {
     func showError(_ error: String) {
         hudView.mode = .error
         hudView.statusText = error
-        hudView.rightText = nil
-        present()
-    }
-
-    /// Atpakaļsaderības metode — rāda vienkāršu tekstu.
-    func show(text: String, showLevel: Bool) {
-        hudView.mode = showLevel ? .recording : .success
-        hudView.statusText = text
-        hudView.rightText = nil
-        if showLevel {
-            startTime = CACurrentMediaTime()
-        }
         present()
     }
 
@@ -90,7 +74,6 @@ final class HUDController {
     func hide() {
         stopAnimation()
         hideBackdrop()
-        isVisible = false
         panel.orderOut(nil)
     }
 
@@ -101,8 +84,15 @@ final class HUDController {
         positionOnScreen()
         panel.appearance = NSApp.appearance
         panel.orderFrontRegardless()
-        isVisible = true
-        startAnimation()
+
+        // Animējam tikai dinamiskiem stāvokļiem; statiskie (.success, .error)
+        // netērē CPU uz 60 FPS taimeri.
+        if hudView.mode == .recording || hudView.mode == .transcribing {
+            startAnimation()
+        } else {
+            stopAnimation()
+            hudView.needsDisplay = true
+        }
     }
 
     private func showBackdrop() {
@@ -229,13 +219,27 @@ final class HUDView: NSView {
     static let containerWidth: CGFloat = 360
     static let containerHeight: CGFloat = 88
 
+    // Kešotās gradienta krāsas — izvairāmies no atkārtotas NSColor/CGGradient izveides katrā kadrā.
+    private static let waveGradientColors: [CGColor] = [
+        NSColor(red: 34/255, green: 211/255, blue: 238/255, alpha: 1.0).cgColor,
+        NSColor(red: 168/255, green: 85/255, blue: 247/255, alpha: 1.0).cgColor,
+        NSColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1.0).cgColor
+    ]
+    private static let waveCGGradient: CGGradient? = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(),
+        colors: waveGradientColors as CFArray,
+        locations: [0.0, 0.5, 1.0]
+    )
+    private static let waveNSGradient: NSGradient? = NSGradient(colors: [
+        NSColor(red: 34/255, green: 211/255, blue: 238/255, alpha: 1.0),
+        NSColor(red: 168/255, green: 85/255, blue: 247/255, alpha: 1.0),
+        NSColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1.0)
+    ])
+
     var mode: Mode = .recording {
         didSet { needsDisplay = true }
     }
     var statusText: String = "" {
-        didSet { needsDisplay = true }
-    }
-    var rightText: String? {
         didSet { needsDisplay = true }
     }
     var level: CGFloat = 0 {
@@ -448,12 +452,7 @@ final class HUDView: NSView {
         let waveHeight: CGFloat = 48
         let waveRect = NSRect(x: 14, y: 8, width: bounds.width - 28, height: waveHeight)
 
-        // Gradienta krāsas: Cyan -> Purple -> Pink
-        let cyan = NSColor(red: 34/255, green: 211/255, blue: 238/255, alpha: 1.0)
-        let purple = NSColor(red: 168/255, green: 85/255, blue: 247/255, alpha: 1.0)
-        let pink = NSColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1.0)
-
-        let gradient = NSGradient(colors: [cyan, purple, pink])
+        let gradient = Self.waveNSGradient
         let centerY = waveRect.midY
 
         switch mode {
@@ -492,8 +491,8 @@ final class HUDView: NSView {
             }
         }
 
-        // Gradienta stroke — zīmējam pa segmentiem ar krāsu pāreju
-        drawGradientStroke(path: path, in: rect, gradient: gradient, lineWidth: 2.0)
+        // Gradienta stroke — vienā piegājienā ar CoreGraphics
+        drawGradientStroke(path: path, in: rect, lineWidth: 2.0)
 
         // Glow slānis
         let glowPath = path.copy() as! NSBezierPath
@@ -525,7 +524,7 @@ final class HUDView: NSView {
             }
         }
 
-        drawGradientStroke(path: path, in: rect, gradient: gradient, lineWidth: 2.0)
+        drawGradientStroke(path: path, in: rect, lineWidth: 2.0)
 
         // Pulsējošs glow
         let glowPath = path.copy() as! NSBezierPath
@@ -551,80 +550,25 @@ final class HUDView: NSView {
         glowPath.fill()
     }
 
-    /// Zīmē gradienta līniju, sadalot to segmentos ar krāsu pāreju.
-    private func drawGradientStroke(path: NSBezierPath, in rect: NSRect, gradient: NSGradient?, lineWidth: CGFloat) {
-        guard let gradient = gradient else {
+    /// Zīmē gradienta līniju vienā piegājienā, izmantojot CoreGraphics stroked-path klipu.
+    private func drawGradientStroke(path: NSBezierPath, in rect: NSRect, lineWidth: CGFloat) {
+        if let ctx = NSGraphicsContext.current?.cgContext, let cgGrad = Self.waveCGGradient {
+            ctx.saveGState()
+            ctx.addPath(path.cgPath)
+            ctx.setLineWidth(lineWidth)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            ctx.drawLinearGradient(cgGrad,
+                                   start: CGPoint(x: rect.minX, y: rect.midY),
+                                   end: CGPoint(x: rect.maxX, y: rect.midY),
+                                   options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+            ctx.restoreGState()
+        } else {
             NSColor.white.setStroke()
             path.lineWidth = lineWidth
             path.stroke()
-            return
         }
-
-        // Sadalām ceļu segmentos un katram piešķiram gradienta krāsu
-        let points = extractPoints(from: path)
-        guard points.count > 1 else { return }
-
-        for i in 0..<(points.count - 1) {
-            let p0 = points[i]
-            let p1 = points[i + 1]
-            let t = (p0.x - rect.minX) / max(rect.width, 1)
-            let color = gradientColor(at: t, gradient: gradient)
-            color.setStroke()
-            let seg = NSBezierPath()
-            seg.lineWidth = lineWidth
-            seg.lineCapStyle = .round
-            seg.move(to: p0)
-            seg.line(to: p1)
-            seg.stroke()
-        }
-    }
-
-    private func extractPoints(from path: NSBezierPath) -> [NSPoint] {
-        var points: [NSPoint] = []
-        path.element(at: 0, associatedPoints: nil)
-        var pts = [NSPoint](repeating: .zero, count: 3)
-        for i in 0..<path.elementCount {
-            let type = path.element(at: i, associatedPoints: &pts)
-            switch type {
-            case .moveTo:
-                points.append(pts[0])
-            case .lineTo:
-                points.append(pts[0])
-            case .curveTo, .cubicCurveTo:
-                points.append(pts[2])
-            case .quadraticCurveTo:
-                points.append(pts[1])
-            case .closePath:
-                break
-            @unknown default:
-                break
-            }
-        }
-        return points
-    }
-
-    private func gradientColor(at t: CGFloat, gradient: NSGradient) -> NSColor {
-        let clamped = min(max(t, 0), 1)
-        // Trīs krāsu gradienta interpolācija
-        let cyan = NSColor(red: 34/255, green: 211/255, blue: 238/255, alpha: 1.0)
-        let purple = NSColor(red: 168/255, green: 85/255, blue: 247/255, alpha: 1.0)
-        let pink = NSColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1.0)
-
-        if clamped < 0.5 {
-            let local = clamped / 0.5
-            return blend(cyan, purple, local)
-        } else {
-            let local = (clamped - 0.5) / 0.5
-            return blend(purple, pink, local)
-        }
-    }
-
-    private func blend(_ a: NSColor, _ b: NSColor, _ t: CGFloat) -> NSColor {
-        let ca = a.usingColorSpace(.deviceRGB) ?? a
-        let cb = b.usingColorSpace(.deviceRGB) ?? b
-        return NSColor(red: ca.redComponent + (cb.redComponent - ca.redComponent) * t,
-                       green: ca.greenComponent + (cb.greenComponent - ca.greenComponent) * t,
-                       blue: ca.blueComponent + (cb.blueComponent - ca.blueComponent) * t,
-                       alpha: ca.alphaComponent + (cb.alphaComponent - ca.alphaComponent) * t)
     }
 }

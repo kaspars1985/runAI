@@ -16,6 +16,10 @@ final class AppLogger {
 
     private let dateFormatter: DateFormatter
 
+    /// Skaitītājs, cik reižu rakstīts kopš pēdējās rotācijas pārbaudes.
+    /// Aizsargāts ar `queue` — piekļuve tikai `queue.async` iekšienē.
+    private var writesSinceRotate = 0
+
     private init() {
         Paths.ensureDirs()
         logURL = Paths.appSupport.appendingPathComponent("runAI.log")
@@ -47,8 +51,7 @@ final class AppLogger {
     // MARK: - Rakstīšana
 
     private func write(level: String, _ message: String) {
-        let timestamp = dateFormatter.string(from: Date())
-        let line = "[\(timestamp)] [\(level)] \(message)\n"
+        let now = Date()
 
         // os.Logger
         switch level {
@@ -57,8 +60,18 @@ final class AppLogger {
         default:      osLogger.info("\(message, privacy: .public)")
         }
 
-        // Fails
+        // Fails — dateFormatter un line tiek veidoti TIKAI queue iekšienē,
+        // lai DateFormatter netiktu lietots ārpus tā sērijveida rindas.
         queue.async { [logURL] in
+            let timestamp = self.dateFormatter.string(from: now)
+            let line = "[\(timestamp)] [\(level)] \(message)\n"
+
+            self.writesSinceRotate += 1
+            if self.writesSinceRotate >= 50 {
+                self.writesSinceRotate = 0
+                self.rotateIfNeeded()
+            }
+
             let fm = FileManager.default
             if !fm.fileExists(atPath: logURL.path) {
                 fm.createFile(atPath: logURL.path, contents: nil)
@@ -82,10 +95,6 @@ final class AppLogger {
     static func warn(_ msg: String)  { shared.write(level: "WARN", msg) }
     static func error(_ msg: String) { shared.write(level: "ERROR", msg) }
     static func flush()              { shared.queue.sync {} }
-
-    func info(_ msg: String)  { write(level: "INFO", msg) }
-    func warn(_ msg: String)  { write(level: "WARN", msg) }
-    func error(_ msg: String) { write(level: "ERROR", msg) }
 
     // MARK: - Crash handlers
 

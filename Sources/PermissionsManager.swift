@@ -127,25 +127,6 @@ final class PermissionsManager: ObservableObject {
         }
     }
 
-    /// Atiestata Ievades parraudzības atļauju lietotnei un pieprasa to no jauna.
-    /// `tccutil` tiek izpildīts asinhroni, lai nebloķētu galveno pavedienu.
-    func resetAndPromptInputMonitoring() {
-        Task {
-            await Task.detached(priority: .userInitiated) {
-                let task = Process()
-                task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-                task.arguments = ["reset", "ListenEvent", "lv.runai.app"]
-                do {
-                    try task.run()
-                    task.waitUntilExit()
-                } catch {
-                    // Ja tccutil neizdodas, turpinām — vismaz pieprasīsim atļauju no jauna.
-                }
-            }.value
-            self.requestInputMonitoring()
-        }
-    }
-
     // MARK: - Universālā piekļuve
 
     func refreshAccessibility() {

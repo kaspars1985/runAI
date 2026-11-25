@@ -16,6 +16,7 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
     private var tasks: [String: URLSessionDownloadTask] = [:]
 
     func download(_ entry: ModelEntry, completion: @escaping (Result<URL, Error>) -> Void) {
+        guard !activeDownloads.contains(entry.fileName) else { return }
         Paths.ensureDirs()
         let dest = Paths.modelsDir.appendingPathComponent(entry.fileName)
         if FileManager.default.fileExists(atPath: dest.path) {
@@ -30,17 +31,6 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
         self.completions[entry.fileName] = completion
         self.tasks[entry.fileName] = task
         task.resume()
-    }
-
-    /// Atceļ aktīvo lejupielādi un paziņo par kļūdu.
-    func cancel(_ fileName: String) {
-        let task = self.tasks[fileName]
-        task?.cancel()
-        let error = NSError(domain: "runAI.ModelManager", code: -999,
-                            userInfo: [NSLocalizedDescriptionKey: "Lejupielāde atcelta"])
-        if self.completions[fileName] != nil {
-            self.finish(name: fileName, result: .failure(error))
-        }
     }
 
     func delete(_ fileName: String) {

@@ -1,14 +1,17 @@
 import Foundation
 import whisper
+import os
 
 enum WhisperError: Error, LocalizedError {
     case notLoaded
     case loadFailed
+    case transcribeFailed(Int32)
 
     var errorDescription: String? {
         switch self {
         case .notLoaded:  return "Modelis nav ielādēts"
         case .loadFailed: return "Neizdevās ielādēt modeli"
+        case .transcribeFailed(let code): return "Atšifrēšana neizdevās (kods \(code))"
         }
     }
 }
@@ -18,53 +21,51 @@ enum WhisperError: Error, LocalizedError {
 final class WhisperEngine: @unchecked Sendable {
     private var ctx: OpaquePointer?
     private let queue = DispatchQueue(label: "lv.runai.whisper", qos: .userInitiated)
-    private(set) var loadedPath: String?
 
-    /// Aizsargā _isLoaded, lai isLoaded varētu atgriezties acumirklī bez bloķēšanas.
-    private var unfairLock = os_unfair_lock_s()
-    private var _isLoaded: Bool = false
+    /// Aizsargā ielādes stāvokli, lai isLoaded varētu atgriezties acumirklī bez bloķēšanas.
+    private let loadedLock = OSAllocatedUnfairLock(initialState: false)
 
     var isLoaded: Bool {
-        os_unfair_lock_lock(&unfairLock)
-        let value = _isLoaded
-        os_unfair_lock_unlock(&unfairLock)
-        return value
+        loadedLock.withLock { $0 }
     }
 
-    private func setLoaded(_ value: Bool) {
-        os_unfair_lock_lock(&unfairLock)
-        _isLoaded = value
-        os_unfair_lock_unlock(&unfairLock)
-    }
-
-    func load(path: String) throws {
-        setLoaded(false)
-        try queue.sync {
-            if let old = ctx {
+    func load(path: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        queue.async {
+            self.loadedLock.withLock { $0 = false }
+            if let old = self.ctx {
                 whisper_free(old)
-                ctx = nil
+                self.ctx = nil
             }
             var cparams = whisper_context_default_params()
             cparams.use_gpu = true
             guard let c = whisper_init_from_file_with_params(path, cparams) else {
-                loadedPath = nil
-                setLoaded(false)
-                throw WhisperError.loadFailed
+                self.loadedLock.withLock { $0 = false }
+                DispatchQueue.main.async { completion(.failure(WhisperError.loadFailed)) }
+                return
             }
-            ctx = c
-            loadedPath = path
-            setLoaded(true)
+            self.ctx = c
+            self.loadedLock.withLock { $0 = true }
+            DispatchQueue.main.async { completion(.success(())) }
         }
     }
 
     func unload() {
-        queue.sync {
-            if let old = ctx {
+        queue.async {
+            if let old = self.ctx {
                 whisper_free(old)
-                ctx = nil
+                self.ctx = nil
             }
-            loadedPath = nil
-            setLoaded(false)
+            self.loadedLock.withLock { $0 = false }
+        }
+    }
+
+    func unloadSync() {
+        queue.sync {
+            if let old = self.ctx {
+                whisper_free(old)
+                self.ctx = nil
+            }
+            self.loadedLock.withLock { $0 = false }
         }
     }
 
@@ -126,6 +127,8 @@ final class WhisperEngine: @unchecked Sendable {
 
             if fullResult != 0 {
                 AppLogger.warn("WhisperEngine: whisper_full atgrieza kodu \(fullResult)")
+                DispatchQueue.main.async { completion(.failure(WhisperError.transcribeFailed(fullResult))) }
+                return
             }
 
             let n = whisper_full_n_segments(ctx)

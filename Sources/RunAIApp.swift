@@ -39,7 +39,7 @@ final class SettingsWindowController {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    func updateAppearance(_ appearance: NSAppearance?) {
+    func updateAppearance() {
         applyAppearance()
     }
 
